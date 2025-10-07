@@ -1,0 +1,1244 @@
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const path = require('path');
+const fs = require('fs').promises;
+// Lazy-loaded heavy modules (required on demand to speed up app startup)
+let pdfParse;
+let parsePresentation;
+let summarizeText;
+let encrypt;
+let decrypt;
+let validateEncryption;
+let calculateFileHash;
+
+let mainWindow;
+let splashWindow;
+const appStartTime = Date.now();
+let splashShownAt = 0;
+const MIN_SPLASH_TIME = 1500; // ms - minimum time to show splash to avoid blinking
+
+// Append debug startup timestamps to a log file in userData for packaged apps
+async function logStartup(message) {
+  try {
+    const logDir = app.getPath('userData');
+    const logPath = path.join(logDir, 'startup.log');
+    const entry = `${new Date().toISOString()} ${message}\n`;
+    await fs.mkdir(logDir, { recursive: true }).catch(() => {});
+    await fs.appendFile(logPath, entry, 'utf8');
+  } catch (err) {
+    // Don't crash if logging fails
+    try { console.error('startup log failed', err.message); } catch (e) { }
+  }
+}
+
+// Default storage paths with new structure
+const defaultUserDataPath = app.getPath('userData');
+const defaultDataPath = path.join(defaultUserDataPath, 'data');
+const defaultDocumentsStoragePath = path.join(defaultDataPath, 'documents');
+const defaultSettingsPath = path.join(defaultDataPath, 'settings.json');
+const defaultKeystorePath = path.join(defaultDataPath, 'keystore.enc');
+
+// For portable mode, use directory where executable is located, not app.getAppPath()
+// app.getAppPath() returns the resources folder inside .asar which is read-only
+// We need the actual executable directory for portable mode
+const getExecutableDir = () => {
+  if (process.env.PORTABLE_EXECUTABLE_DIR) {
+    return process.env.PORTABLE_EXECUTABLE_DIR;
+  }
+  // In development, use app.getAppPath()
+  if (!app.isPackaged) {
+    return app.getAppPath();
+  }
+  // In production, use the directory containing the executable
+  return path.dirname(app.getPath('exe'));
+};
+
+const appDirectory = getExecutableDir();
+const localAppDataPath = path.join(appDirectory, 'data');
+const localAppDocumentsPath = path.join(localAppDataPath, 'documents');
+const localAppSettingsPath = path.join(localAppDataPath, 'settings.json');
+const localAppKeystorePath = path.join(localAppDataPath, 'keystore.enc');
+
+// Current storage paths (loaded from settings)
+let dataPath = defaultDataPath;
+let documentsStoragePath = defaultDocumentsStoragePath;
+let settingsPath = defaultSettingsPath;
+let keystorePath = defaultKeystorePath;
+
+// Default settings structure
+const defaultSettings = {
+  storageLocation: 'appdata',
+  dataPath: defaultDataPath,
+  theme: 'dark',
+  aiModel: 'openai/gpt-4o-mini',  // Updated to OpenRouter format
+  version: '1.0.0'
+};
+
+// Auto-detect storage location based on where data folder exists
+async function detectStorageLocation() {
+  // Check if data folder exists in local app directory
+  try {
+    await fs.access(localAppDataPath);
+    await fs.access(path.join(localAppDataPath, 'documents'));
+    // Local app data exists
+    return {
+      location: 'local-app',
+      dataPath: localAppDataPath
+    };
+  } catch (error) {
+    // Local app doesn't exist or is not accessible
+  }
+  
+  // Check if data folder exists in appdata
+  try {
+    await fs.access(defaultDataPath);
+    await fs.access(path.join(defaultDataPath, 'documents'));
+    // AppData exists
+    return {
+      location: 'appdata',
+      dataPath: defaultDataPath
+    };
+  } catch (error) {
+    // AppData doesn't exist
+  }
+  
+  // Default to appdata if nothing exists
+  return {
+    location: 'appdata',
+    dataPath: defaultDataPath
+  };
+}
+
+// Load settings from JSON file
+async function loadSettings() {
+  try {
+    // Auto-detect storage location
+    const detected = await detectStorageLocation();
+    
+    // Try to load settings from detected location
+    const detectedSettingsPath = path.join(detected.dataPath, 'settings.json');
+    
+    try {
+      const settingsData = await fs.readFile(detectedSettingsPath, 'utf8');
+      const settings = JSON.parse(settingsData);
+      
+      // Update current paths based on detected location
+      dataPath = detected.dataPath;
+      documentsStoragePath = path.join(dataPath, 'documents');
+      settingsPath = path.join(dataPath, 'settings.json');
+      keystorePath = path.join(dataPath, 'keystore.enc');
+      
+      // Ensure storageLocation is set correctly
+      settings.storageLocation = detected.location;
+      settings.dataPath = detected.dataPath;
+      
+      return settings;
+    } catch (error) {
+      // Settings file doesn't exist, create default with detected location
+      dataPath = detected.dataPath;
+      documentsStoragePath = path.join(dataPath, 'documents');
+      settingsPath = path.join(dataPath, 'settings.json');
+      keystorePath = path.join(dataPath, 'keystore.enc');
+      
+      return {
+        ...defaultSettings,
+        storageLocation: detected.location,
+        dataPath: detected.dataPath
+      };
+    }
+  } catch (error) {
+    // Fallback to defaults
+    return { ...defaultSettings };
+  }
+}
+
+// Save settings to JSON file
+async function saveSettings(settings) {
+  try {
+    await fs.mkdir(dataPath, { recursive: true });
+    await fs.writeFile(settingsPath, JSON.stringify(settings, null, 2), 'utf8');
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Ensure all data directories exist
+async function ensureDataDirectories(customPath = null) {
+  try {
+    const targetDataPath = customPath || dataPath;
+    const targetDocsPath = path.join(targetDataPath, 'documents');
+    
+    await fs.mkdir(targetDataPath, { recursive: true });
+    await fs.mkdir(targetDocsPath, { recursive: true });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to create data directories:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 500,
+    height: 300,
+    frame: false,
+    transparent: false,
+    alwaysOnTop: true,
+    resizable: false,
+    movable: true,
+    center: true,
+    show: true,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+
+  // No menu for splash
+  Menu.setApplicationMenu(null);
+
+  splashWindow.loadFile('splash.html');
+
+  // Record when splash finished loading (painted)
+  splashWindow.webContents.once('did-finish-load', () => {
+    // Give the renderer a quick moment to paint
+    setTimeout(() => {
+      try { splashShownAt = Date.now(); } catch (e) { splashShownAt = Date.now(); }
+      logStartup(`splashShown:${splashShownAt}`);
+    }, 30);
+  });
+}
+
+function createMainWindow() {
+  mainWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    show: false, // create hidden and show when ready
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    },
+    icon: path.join(__dirname, 'assets', 'icon.png')
+  });
+
+  // Remove the default menu bar
+  Menu.setApplicationMenu(null);
+
+  mainWindow.loadFile('index.html');
+
+  // Open DevTools in development
+  if (process.env.NODE_ENV === 'development') {
+    mainWindow.webContents.openDevTools();
+  }
+
+  // When the renderer signals it's ready to show, close splash and show main
+  mainWindow.once('ready-to-show', () => {
+    const readyTime = Date.now();
+    console.log(`Main window ready-to-show (startup ${(readyTime - appStartTime)} ms)`);
+    // Log main window ready time for packaged diagnostics
+    logStartup(`mainReady:${readyTime}:${readyTime - appStartTime}`);
+    const now = Date.now();
+    const shownDelta = splashShownAt ? (now - splashShownAt) : Infinity;
+
+    const finish = () => {
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        try { splashWindow.close(); } catch (e) { /* ignore */ }
+      }
+      // Log when main is shown
+      logStartup(`mainShown:${Date.now()}`);
+      mainWindow.show();
+    };
+
+    if (!splashShownAt) {
+      // If splash hasn't finished loading, wait a short time but force show after MIN_SPLASH_TIME
+      const timeout = Math.max(100, MIN_SPLASH_TIME);
+      setTimeout(() => finish(), timeout);
+    } else if (shownDelta < MIN_SPLASH_TIME) {
+      setTimeout(() => finish(), MIN_SPLASH_TIME - shownDelta);
+    } else {
+      finish();
+    }
+  });
+
+  // Fallback: if main hasn't emitted ready-to-show in 30s, force show
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isVisible()) {
+      console.warn('Main window did not become ready in 30s; showing anyway');
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        try { splashWindow.close(); } catch (e) { /* ignore */ }
+      }
+      mainWindow.show();
+    }
+  }, 30000);
+}
+
+app.whenReady().then(async () => {
+  // Show splash quickly so user gets feedback during potentially long startup
+  createSplashWindow();
+
+  // Perform initialization while splash is visible
+  const initStart = Date.now();
+  await loadSettings();
+  await ensureDataDirectories();
+  // Migrate old storage format if needed
+  await migrateOldStorage();
+  const initEnd = Date.now();
+  console.log(`Initialization finished in ${initEnd - initStart} ms`);
+  // Log initialization end for packaged diagnostics
+  logStartup(`initEnd:${initEnd}:${initEnd - initStart}`);
+
+  // Create main window (hidden) and let it show when ready
+  createMainWindow();
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createMainWindow();
+    }
+  });
+  
+  // -------------------------
+  // Auto-updater (GitHub Releases)
+  // -------------------------
+  try {
+    const { autoUpdater } = require('electron-updater');
+    const log = require('electron-log');
+
+    if (app.isPackaged) {
+      autoUpdater.logger = log;
+      autoUpdater.logger.transports.file.level = 'info';
+      autoUpdater.autoDownload = true; // set to false if you prefer manual download
+
+      autoUpdater.on('checking-for-update', () => {
+        log.info('Checking for update...');
+        if (mainWindow) mainWindow.webContents.send('update-checking');
+      });
+
+      autoUpdater.on('update-available', (info) => {
+        log.info('Update available:', info.version);
+        if (mainWindow) mainWindow.webContents.send('update-available', info);
+      });
+
+      autoUpdater.on('update-not-available', (info) => {
+        log.info('Update not available');
+        if (mainWindow) mainWindow.webContents.send('update-not-available', info);
+      });
+
+      autoUpdater.on('error', (err) => {
+        log.warn('Update error:', err == null ? 'unknown' : (err.stack || err).toString());
+        if (mainWindow) mainWindow.webContents.send('update-error', { message: err && err.message });
+      });
+
+      autoUpdater.on('download-progress', (progress) => {
+        if (mainWindow) mainWindow.webContents.send('update-progress', progress);
+      });
+
+      autoUpdater.on('update-downloaded', (info) => {
+        log.info('Update downloaded:', info.version);
+        if (mainWindow) mainWindow.webContents.send('update-downloaded', info);
+        // Let the renderer prompt the user; renderer can call ipc to trigger quitAndInstall
+      });
+
+      // Check for updates after a short delay so the app finishes startup first
+      setTimeout(() => {
+        try { autoUpdater.checkForUpdates().catch(e => log.error(e)); } catch (e) { log.error(e); }
+      }, 5000);
+    }
+  } catch (e) {
+    console.warn('auto-updater not available in this environment', e && e.message);
+  }
+});
+
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+// Handle file selection
+ipcMain.handle('select-file', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openFile', 'multiSelections'],
+    filters: [
+      { name: 'Documents', extensions: ['pdf', 'pptx', 'ppt'] },
+      { name: 'PDF Files', extensions: ['pdf'] },
+      { name: 'PowerPoint Files', extensions: ['pptx', 'ppt'] }
+    ]
+  });
+
+  if (result.canceled) {
+    return null;
+  }
+
+  return result.filePaths;
+});
+
+// Process documents
+ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching') => {
+  const results = [];
+  const totalFiles = filePaths.length;
+
+  // Lazy-load heavy modules to avoid increasing startup time
+  if (!calculateFileHash) {
+    calculateFileHash = require('./utils/fileHash').calculateFileHash;
+  }
+  if (!pdfParse) {
+    pdfParse = require('pdf-parse-fork');
+  }
+  if (!parsePresentation) {
+    parsePresentation = require('./utils/pptxParser').parsePresentation;
+  }
+  if (!summarizeText) {
+    summarizeText = require('./utils/aiSummarizer').summarizeText;
+  }
+
+  for (let i = 0; i < filePaths.length; i++) {
+    const filePath = filePaths[i];
+    try {
+      const fileName = path.basename(filePath);
+      const ext = path.extname(filePath).toLowerCase();
+      
+      // Send initial progress
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Starting...',
+        stage: 'init'
+      });
+      
+      // Calculate file hash for duplicate detection
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Checking for duplicates...',
+        stage: 'duplicate-check'
+      });
+      
+      const fileHash = await calculateFileHash(filePath);
+      
+      // Check for duplicates
+      const duplicateCheck = await findDuplicateDocument(fileHash);
+      
+      if (duplicateCheck.exists) {
+        // Show duplicate dialog to user
+        const choice = await dialog.showMessageBox(mainWindow, {
+          type: 'question',
+          title: 'Duplicate Document Found',
+          message: `A document with the same content already exists:\n\n"${duplicateCheck.fileName}"\n\nWhat would you like to do?`,
+          buttons: ['Cancel', 'Overwrite Existing', 'Create New Copy'],
+          defaultId: 0,
+          cancelId: 0
+        });
+        
+        if (choice.response === 0) {
+          // Cancel - skip this file
+          event.sender.send('processing-progress', {
+            fileName,
+            fileIndex: i + 1,
+            totalFiles,
+            status: 'Cancelled by user',
+            stage: 'cancelled'
+          });
+          
+          results.push({
+            fileName,
+            success: false,
+            error: 'Cancelled by user (duplicate found)'
+          });
+          continue;
+        } else if (choice.response === 1) {
+          // Overwrite - delete old folder and create new one
+          event.sender.send('processing-progress', {
+            fileName,
+            fileIndex: i + 1,
+            totalFiles,
+            status: 'Removing old version...',
+            stage: 'cleanup'
+          });
+          await fs.rm(duplicateCheck.folderPath, { recursive: true, force: true }).catch(() => {});
+        }
+        // If response === 2, just continue and create new copy
+      }
+      
+      // Generate unique folder ID
+      const folderId = generateShortUUID();
+      const folderPath = path.join(documentsStoragePath, folderId);
+      
+      // Create folder for this document
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Creating storage folder...',
+        stage: 'setup'
+      });
+      
+      await fs.mkdir(folderPath, { recursive: true });
+      
+      // Copy file to folder with original name
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Storing document...',
+        stage: 'storing'
+      });
+      
+      const storedFilePath = path.join(folderPath, fileName);
+      await fs.copyFile(filePath, storedFilePath);
+      
+      let text = '';
+
+      // Extract text based on file type
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: ext === '.pdf' ? 'Extracting text from PDF...' : 'Extracting text from PowerPoint...',
+        stage: 'extracting'
+      });
+      
+      if (ext === '.pdf') {
+        const dataBuffer = await fs.readFile(filePath);
+        const pdfData = await pdfParse(dataBuffer);
+        text = pdfData.text;
+      } else if (ext === '.pptx' || ext === '.ppt') {
+        text = await parsePresentation(filePath);
+      }
+
+      if (!text || text.trim().length === 0) {
+        // Clean up folder if extraction failed
+        await fs.rm(folderPath, { recursive: true, force: true }).catch(() => {});
+        
+        event.sender.send('processing-progress', {
+          fileName,
+          fileIndex: i + 1,
+          totalFiles,
+          status: 'Failed - No text found',
+          stage: 'error'
+        });
+        
+        results.push({
+          fileName,
+          success: false,
+          error: 'No text content found in document'
+        });
+        continue;
+      }
+
+      // Send progress update
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Generating AI summary...',
+        stage: 'summarizing',
+        charCount: text.length
+      });
+
+      // Summarize using AI with tone and style
+      const summary = await summarizeText(text, summaryType, apiKey, responseTone, model, summaryStyle);
+      
+      // Save summary
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Saving summary...',
+        stage: 'saving'
+      });
+
+      // Save summary data to folder (including file hash)
+      // Create a better preview - clean and readable
+      let previewText = text.substring(0, 500);
+      
+      // For PowerPoint, try to get first few slides' content
+      if (ext === '.pptx' || ext === '.ppt') {
+        const slideMatch = text.match(/--- Slide \d+ ---\n([\s\S]*?)(?=\n--- Slide \d+ ---|$)/);
+        if (slideMatch && slideMatch[1]) {
+          previewText = slideMatch[1].substring(0, 500);
+        }
+      }
+      
+      const summaryData = {
+        fileName,
+        fileType: ext,
+        fileHash,
+        summary,
+        originalLength: text.length,
+        summaryLength: summary.length,
+        summaryType,
+        responseTone,
+        summaryStyle,  // Store the style used
+        timestamp: new Date().toISOString(),
+        model: model,  // Store the actual model used
+        preview: previewText.trim() + (text.length > 500 ? '...' : '')
+      };
+      
+      await saveSummaryToFolder(folderId, summaryData);
+      
+      // Send completion progress
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Complete! ✓',
+        stage: 'complete'
+      });
+
+      results.push({
+        fileName,
+        folderId,
+        fileType: ext,
+        success: true,
+        originalLength: text.length,
+        originalText: text,
+        summary
+      });
+
+    } catch (error) {
+      // Parse error message to determine type
+      let errorType = 'error';
+      let displayMessage = error.message;
+      
+      if (error.message.startsWith('RATE_LIMIT:')) {
+        errorType = 'rate-limit';
+        displayMessage = error.message.replace('RATE_LIMIT: ', '');
+      } else if (error.message.startsWith('QUOTA_EXCEEDED:')) {
+        errorType = 'quota';
+        displayMessage = error.message.replace('QUOTA_EXCEEDED: ', '');
+      } else if (error.message.startsWith('INVALID_API_KEY:')) {
+        errorType = 'api-key';
+        displayMessage = error.message.replace('INVALID_API_KEY: ', '');
+      }
+      
+      event.sender.send('processing-progress', {
+        fileName: path.basename(filePath),
+        fileIndex: i + 1,
+        totalFiles,
+        status: displayMessage,
+        stage: 'error',
+        errorType: errorType
+      });
+      
+      results.push({
+        fileName: path.basename(filePath),
+        success: false,
+        error: displayMessage,
+        errorType: errorType
+      });
+    }
+  }
+
+  return results;
+});
+
+// Save summary to file
+ipcMain.handle('save-summary', async (event, fileName, summary) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: `${fileName}_summary.txt`,
+    filters: [
+      { name: 'Text Files', extensions: ['txt'] },
+      { name: 'Markdown Files', extensions: ['md'] },
+      { name: 'All Files', extensions: ['*'] }
+    ]
+  });
+
+  if (result.canceled) {
+    return { success: false };
+  }
+
+  try {
+    await fs.writeFile(result.filePath, summary, 'utf-8');
+    return { success: true, filePath: result.filePath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Validate API key
+ipcMain.handle('validate-api-key', async (event, apiKey) => {
+  try {
+    const OpenAI = require('openai');
+    const openai = new OpenAI({ 
+      apiKey,
+      baseURL: 'https://openrouter.ai/api/v1'
+    });
+    // Try to list models to validate the key
+    await openai.models.list();
+    return { valid: true };
+  } catch (error) {
+    return { valid: false, error: error.message };
+  }
+});
+
+// Save API key securely using encryption
+ipcMain.handle('save-api-key', async (event, apiKey) => {
+  try {
+    // Lazy-load encryption helpers
+    if (!validateEncryption) {
+      const enc = require('./utils/encryption');
+      encrypt = enc.encrypt;
+      decrypt = enc.decrypt;
+      validateEncryption = enc.validateEncryption;
+    }
+
+    // Validate encryption is working
+    if (!validateEncryption()) {
+      return { success: false, error: 'Encryption validation failed' };
+    }
+
+    // Encrypt the API key
+    const encryptedKey = encrypt(apiKey);
+    
+    // Ensure data directory exists
+    await fs.mkdir(dataPath, { recursive: true });
+    
+    // Save encrypted key to file
+    await fs.writeFile(keystorePath, encryptedKey, 'utf8');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to save API key:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Load API key securely using encryption
+ipcMain.handle('load-api-key', async () => {
+  try {
+    // Check if keystore file exists
+    try {
+      await fs.access(keystorePath);
+    } catch {
+      // File doesn't exist, return empty
+      return { success: true, apiKey: '' };
+    }
+    
+    // Read encrypted key from file
+    const encryptedKey = await fs.readFile(keystorePath, 'utf8');
+    
+    if (!encryptedKey) {
+      return { success: true, apiKey: '' };
+    }
+    
+    // Decrypt the API key
+    if (!decrypt) {
+      const enc = require('./utils/encryption');
+      encrypt = enc.encrypt;
+      decrypt = enc.decrypt;
+      validateEncryption = enc.validateEncryption;
+    }
+    const apiKey = decrypt(encryptedKey);
+    
+    return { success: true, apiKey };
+  } catch (error) {
+    console.error('Failed to load API key:', error);
+    return { success: false, error: error.message, apiKey: '' };
+  }
+});
+
+// Delete API key
+ipcMain.handle('delete-api-key', async () => {
+  try {
+    // Delete keystore file
+    try {
+      await fs.unlink(keystorePath);
+    } catch (error) {
+      // File might not exist, which is fine
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to delete API key:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Read file for preview - now reads from folder
+ipcMain.handle('read-stored-file', async (event, folderId) => {
+  try {
+    const folderPath = path.join(documentsStoragePath, folderId);
+    
+    // Read summary.json to get the filename
+    const summaryPath = path.join(folderPath, 'summary.json');
+    const summaryData = JSON.parse(await fs.readFile(summaryPath, 'utf8'));
+    
+    // Read the actual document file
+    const filePath = path.join(folderPath, summaryData.fileName);
+    const dataBuffer = await fs.readFile(filePath);
+    
+    return { 
+      success: true, 
+      data: dataBuffer.toString('base64'), 
+      mimeType: getMimeType(summaryData.fileName),
+      fileName: summaryData.fileName
+    };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Get file info - now checks folder
+ipcMain.handle('check-file-exists', async (event, folderId) => {
+  try {
+    const folderPath = path.join(documentsStoragePath, folderId);
+    await fs.access(folderPath);
+    
+    // Also check for summary.json
+    const summaryPath = path.join(folderPath, 'summary.json');
+    await fs.access(summaryPath);
+    
+    return { exists: true };
+  } catch (error) {
+    return { exists: false };
+  }
+});
+
+// Delete stored file - now deletes entire folder
+ipcMain.handle('delete-stored-file', async (event, folderId) => {
+  try {
+    const folderPath = path.join(documentsStoragePath, folderId);
+    await fs.rm(folderPath, { recursive: true, force: true });
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Helper function to get MIME type
+function getMimeType(fileName) {
+  const ext = path.extname(fileName).toLowerCase();
+  const mimeTypes = {
+    '.pdf': 'application/pdf',
+    '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    '.ppt': 'application/vnd.ms-powerpoint'
+  };
+  return mimeTypes[ext] || 'application/octet-stream';
+}
+
+// Get storage paths
+ipcMain.handle('get-storage-paths', async () => {
+  const settings = await loadSettings();
+  return {
+    appdata: defaultDocumentsStoragePath,
+    appdataFull: defaultDataPath,
+    localApp: localAppDocumentsPath,
+    localAppFull: localAppDataPath,
+    current: documentsStoragePath,
+    currentFull: dataPath,
+    settings: settings
+  };
+});
+
+// Get settings
+ipcMain.handle('get-settings', async () => {
+  return await loadSettings();
+});
+
+// Save settings
+ipcMain.handle('save-settings', async (event, newSettings) => {
+  const currentSettings = await loadSettings();
+  const updatedSettings = { ...currentSettings, ...newSettings };
+  return await saveSettings(updatedSettings);
+});
+
+// Change storage location
+ipcMain.handle('change-storage-location', async (event, storageLocation) => {
+  try {
+    let newDataPath;
+    
+    switch (storageLocation) {
+      case 'appdata':
+        newDataPath = defaultDataPath;
+        break;
+      case 'local-app':
+        newDataPath = localAppDataPath;
+        break;
+      default:
+        return { success: false, error: 'Invalid storage location' };
+    }
+    
+    const newDocumentsPath = path.join(newDataPath, 'documents');
+    const newSettingsPath = path.join(newDataPath, 'settings.json');
+    const newKeystorePath = path.join(newDataPath, 'keystore.enc');
+    
+    // Create new directories
+    await ensureDataDirectories(newDataPath);
+    
+    // Store old paths
+    const oldDataPath = dataPath;
+    const oldDocsPath = documentsStoragePath;
+    const oldSettingsPath = settingsPath;
+    const oldKeystorePath = keystorePath;
+    
+    if (oldDocsPath !== newDocumentsPath) {
+      try {
+        // Move documents
+        const files = await fs.readdir(oldDocsPath);
+        for (const file of files) {
+          const oldFilePath = path.join(oldDocsPath, file);
+          const newFilePath = path.join(newDocumentsPath, file);
+          await fs.copyFile(oldFilePath, newFilePath);
+        }
+        
+        // Copy settings file if exists
+        try {
+          await fs.copyFile(oldSettingsPath, newSettingsPath);
+        } catch (err) {
+          // Settings file might not exist yet
+        }
+        
+        // Copy keystore file if exists
+        try {
+          await fs.copyFile(oldKeystorePath, newKeystorePath);
+        } catch (err) {
+          // Keystore file might not exist yet
+        }
+        
+        // Delete old files after successful copy
+        for (const file of files) {
+          await fs.unlink(path.join(oldDocsPath, file)).catch(() => {});
+        }
+        
+        // Delete old keystore and settings
+        await fs.unlink(oldKeystorePath).catch(() => {});
+        await fs.unlink(oldSettingsPath).catch(() => {});
+        
+        // Try to remove old directories if they're empty
+        try {
+          await fs.rmdir(oldDocsPath);
+          await fs.rmdir(oldDataPath);
+        } catch (err) {
+          // Directories might not be empty or might fail to delete, that's ok
+          console.log('Could not delete old directories (they may not be empty):', err.message);
+        }
+      } catch (error) {
+        console.log('No files to move or old path does not exist');
+      }
+    }
+    
+    // Update current paths
+    dataPath = newDataPath;
+    documentsStoragePath = newDocumentsPath;
+    settingsPath = newSettingsPath;
+    keystorePath = newKeystorePath;
+    
+    // Save new settings
+    const currentSettings = await loadSettings();
+    const updatedSettings = {
+      ...currentSettings,
+      storageLocation,
+      dataPath: newDataPath
+    };
+    await saveSettings(updatedSettings);
+    
+    return { success: true, path: newDocumentsPath, dataPath: newDataPath };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Get storage stats
+ipcMain.handle('get-storage-stats', async () => {
+  try {
+    const entries = await fs.readdir(documentsStoragePath, { withFileTypes: true });
+    const folders = entries.filter(entry => entry.isDirectory());
+    
+    let totalSize = 0;
+    let fileCount = 0;
+    
+    for (const folder of folders) {
+      const folderPath = path.join(documentsStoragePath, folder.name);
+      const files = await fs.readdir(folderPath);
+      
+      for (const file of files) {
+        const filePath = path.join(folderPath, file);
+        const stats = await fs.stat(filePath);
+        totalSize += stats.size;
+        fileCount++;
+      }
+    }
+    
+    return {
+      success: true,
+      fileCount: folders.length, // Count folders (each represents a document)
+      totalSize: totalSize,
+      totalSizeMB: (totalSize / (1024 * 1024)).toFixed(2)
+    };
+  } catch (error) {
+    return {
+      success: true,
+      fileCount: 0,
+      totalSize: 0,
+      totalSizeMB: '0.00'
+    };
+  }
+});
+
+// Migrate old storage format to new folder-based format
+async function migrateOldStorage() {
+  try {
+    const oldSummariesPath = path.join(dataPath, 'summaries.json');
+    
+    // Check if old summaries.json exists
+    try {
+      await fs.access(oldSummariesPath);
+    } catch {
+      // No old data to migrate
+      return { success: true, migrated: 0 };
+    }
+    
+    // Read old summaries
+    const data = await fs.readFile(oldSummariesPath, 'utf8');
+    const oldSummaries = JSON.parse(data);
+    
+    if (!Array.isArray(oldSummaries) || oldSummaries.length === 0) {
+      // Delete empty summaries.json
+      await fs.unlink(oldSummariesPath).catch(() => {});
+      return { success: true, migrated: 0 };
+    }
+    
+    console.log(`Migrating ${oldSummaries.length} summaries to new format...`);
+    
+    let migrated = 0;
+    
+    for (const summary of oldSummaries) {
+      try {
+        // Generate folder ID
+        const folderId = generateShortUUID();
+        const folderPath = path.join(documentsStoragePath, folderId);
+        
+        // Create folder
+        await fs.mkdir(folderPath, { recursive: true });
+        
+        // If old format had storedFileName, try to move the file
+        if (summary.storedFileName) {
+          const oldFilePath = path.join(documentsStoragePath, summary.storedFileName);
+          const newFilePath = path.join(folderPath, summary.fileName);
+          
+          try {
+            await fs.access(oldFilePath);
+            await fs.copyFile(oldFilePath, newFilePath);
+            // Delete old file after successful copy
+            await fs.unlink(oldFilePath).catch(() => {});
+          } catch (err) {
+            console.log(`Could not migrate file ${summary.storedFileName}: ${err.message}`);
+            // Continue anyway - we'll still save the summary
+          }
+        }
+        
+        // Create summary.json in new format
+        const newSummary = {
+          fileName: summary.fileName,
+          fileType: summary.fileType,
+          summary: summary.summary,
+          originalLength: summary.originalLength,
+          summaryLength: summary.summaryLength || summary.summary.length,
+          summaryType: summary.summaryType,
+          timestamp: summary.timestamp,
+          model: summary.model || 'gpt-4o-mini',
+          preview: summary.preview || 'Preview not available'
+        };
+        
+        await saveSummaryToFolder(folderId, newSummary);
+        migrated++;
+      } catch (err) {
+        console.error(`Failed to migrate summary ${summary.fileName}:`, err);
+      }
+    }
+    
+    // Delete old summaries.json after successful migration
+    await fs.unlink(oldSummariesPath).catch(() => {});
+    
+    console.log(`Migration complete: ${migrated} summaries migrated`);
+    return { success: true, migrated };
+  } catch (error) {
+    console.error('Migration failed:', error);
+    return { success: false, error: error.message, migrated: 0 };
+  }
+}
+
+// Generate 8-character alphanumeric UUID
+function generateShortUUID() {
+  const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < 8; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
+
+// Check if a document with the same hash already exists
+async function findDuplicateDocument(fileHash) {
+  try {
+    const entries = await fs.readdir(documentsStoragePath, { withFileTypes: true });
+    const folders = entries.filter(entry => entry.isDirectory());
+    
+    for (const folder of folders) {
+      try {
+        const summaryPath = path.join(documentsStoragePath, folder.name, 'summary.json');
+        const data = await fs.readFile(summaryPath, 'utf8');
+        const summaryData = JSON.parse(data);
+        
+        if (summaryData.fileHash === fileHash) {
+          return {
+            exists: true,
+            folderId: folder.name,
+            fileName: summaryData.fileName,
+            folderPath: path.join(documentsStoragePath, folder.name)
+          };
+        }
+      } catch (error) {
+        // Skip folders without valid summary.json
+        continue;
+      }
+    }
+    
+    return { exists: false };
+  } catch (error) {
+    console.error('Error checking for duplicates:', error);
+    return { exists: false };
+  }
+}
+
+// Summary history management - now reads from individual document folders
+async function loadSummaryHistory() {
+  try {
+    // Read all folders in documents directory
+    const entries = await fs.readdir(documentsStoragePath, { withFileTypes: true });
+    const folders = entries.filter(entry => entry.isDirectory());
+    
+    const history = [];
+    
+    for (const folder of folders) {
+      try {
+        const summaryPath = path.join(documentsStoragePath, folder.name, 'summary.json');
+        const data = await fs.readFile(summaryPath, 'utf8');
+        const summaryData = JSON.parse(data);
+        
+        // Add folder ID to data
+        summaryData.folderId = folder.name;
+        history.push(summaryData);
+      } catch (error) {
+        // Skip folders without valid summary.json
+        console.log(`Skipping folder ${folder.name}: ${error.message}`);
+      }
+    }
+    
+    // Sort by timestamp (newest first)
+    history.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    return history;
+  } catch (error) {
+    // Documents folder doesn't exist or is invalid
+    console.error('Failed to load summary history:', error);
+    return [];
+  }
+}
+
+// Save individual summary to its folder
+async function saveSummaryToFolder(folderId, summaryData) {
+  try {
+    const folderPath = path.join(documentsStoragePath, folderId);
+    await fs.mkdir(folderPath, { recursive: true });
+    
+    const summaryPath = path.join(folderPath, 'summary.json');
+    await fs.writeFile(summaryPath, JSON.stringify(summaryData, null, 2), 'utf8');
+    
+    return { success: true, folderId };
+  } catch (error) {
+    console.error('Failed to save summary:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Get summary history
+ipcMain.handle('get-summary-history', async () => {
+  try {
+    const history = await loadSummaryHistory();
+    return { success: true, history };
+  } catch (error) {
+    return { success: false, error: error.message, history: [] };
+  }
+});
+
+// Add summary to history - now handled by saveSummaryToFolder
+ipcMain.handle('add-summary-to-history', async (event, summaryData) => {
+  // This is now a no-op since summaries are saved during processing
+  return { success: true };
+});
+
+// Save entire history - rebuild all summary.json files
+ipcMain.handle('save-history', async (event, history) => {
+  try {
+    // Note: This is complex with folder-based approach
+    // We'll keep existing folders and only update what's in the history array
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Delete summary from history by folder ID
+ipcMain.handle('delete-summary-from-history', async (event, folderId) => {
+  try {
+    const folderPath = path.join(documentsStoragePath, folderId);
+    
+    // Delete entire folder (contains document + summary.json)
+    await fs.rm(folderPath, { recursive: true, force: true });
+    
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear all summary history
+ipcMain.handle('clear-summary-history', async () => {
+  try {
+    // Delete all folders in documents directory
+    const entries = await fs.readdir(documentsStoragePath, { withFileTypes: true });
+    const folders = entries.filter(entry => entry.isDirectory());
+    
+    for (const folder of folders) {
+      const folderPath = path.join(documentsStoragePath, folder.name);
+      await fs.rm(folderPath, { recursive: true, force: true }).catch(err => {
+        console.error(`Failed to delete folder ${folder.name}:`, err);
+      });
+    }
+    
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// IPC: allow renderer to request update checks and trigger install
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    const { autoUpdater } = require('electron-updater');
+    await autoUpdater.checkForUpdates();
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err && err.message };
+  }
+});
+
+ipcMain.handle('install-update', async (event, restartImmediately = true) => {
+  try {
+    const { autoUpdater } = require('electron-updater');
+    // Parameters: isSilent, isForceRunAfter
+    autoUpdater.quitAndInstall(false, restartImmediately);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err && err.message };
+  }
+});
