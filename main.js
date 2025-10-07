@@ -89,11 +89,55 @@ async function runBlockingUpdateCheck(timeoutMs = 15000) {
           try { logStartup('update-downloaded:' + downloadedInfo.version); } catch (e) {}
           safeSend(splashWindow, 'update-downloaded', downloadedInfo);
           try {
-            // Perform a silent install to avoid showing installer UI (Discord-like behavior)
-            // Parameters: isSilent = true, isForceRunAfter = true
-            autoUpdater.quitAndInstall(true, true);
+            // Write diagnostics: current process info and running processes to help debug "cannot be closed" installer dialogs
+            try {
+              const procName = path.basename(process.execPath);
+              try { logStartup('preInstall:pid:' + process.pid); } catch (e) {}
+              try { logStartup('preInstall:execPath:' + process.execPath); } catch (e) {}
+              // Capture tasklist output for Windows to see which processes are running with this image name
+              const { exec } = require('child_process');
+              exec(`tasklist /FI "IMAGENAME eq ${procName}" /V`, { windowsHide: true }, (err, stdout, stderr) => {
+                try {
+                  if (err) {
+                    try { logStartup('tasklistError:' + (err && err.message)); } catch (e) {}
+                  } else {
+                    try { logStartup('tasklist:' + stdout.replace(/\r?\n/g, ' || ')); } catch (e) {}
+                  }
+                } catch (e) { /* ignore */ }
+              });
+            } catch (e) { /* ignore */ }
+
+            // Attempt to force-close any windows we created so file handles are released
+            try {
+              if (splashWindow && !splashWindow.isDestroyed()) {
+                try { splashWindow.destroy(); } catch (e) { /* ignore */ }
+              }
+              if (mainWindow && !mainWindow.isDestroyed()) {
+                try { mainWindow.destroy(); } catch (e) { /* ignore */ }
+              }
+            } catch (e) { /* ignore */ }
+
+            // Give the OS a short moment to release handles then call quitAndInstall
+            setTimeout(() => {
+              try {
+                autoUpdater.quitAndInstall(true, true);
+                // Ensure the app actually exits: request quit and force exit as a fallback
+                try {
+                  app.quit();
+                } catch (e) { /* ignore */ }
+                setTimeout(() => {
+                  try {
+                    // If still running, force immediate exit to release handles for installer
+                    process.exit(0);
+                  } catch (e) { /* ignore */ }
+                }, 1500);
+              } catch (e) {
+                log.error('quitAndInstall failed in blocking flow:', e && (e.stack || e).toString());
+                finish(true);
+              }
+            }, 250);
           } catch (e) {
-            log.error('quitAndInstall failed in blocking flow:', e && (e.stack || e).toString());
+            log.error('pre-install diagnostics failed in blocking flow:', e && (e.stack || e).toString());
             finish(true);
           }
         });
@@ -1374,8 +1418,43 @@ ipcMain.handle('install-update', async (event, restartImmediately = true) => {
   try {
     const { autoUpdater } = require('electron-updater');
     // Parameters: isSilent, isForceRunAfter
-    // Use silent install when triggered from renderer as well
-    autoUpdater.quitAndInstall(true, restartImmediately);
+    // Perform diagnostics and try to close windows prior to install
+    try {
+      try { logStartup('ipcInstall:pid:' + process.pid); } catch (e) {}
+      try { logStartup('ipcInstall:execPath:' + process.execPath); } catch (e) {}
+      const procName = path.basename(process.execPath);
+      const { exec } = require('child_process');
+      exec(`tasklist /FI "IMAGENAME eq ${procName}" /V`, { windowsHide: true }, (err, stdout, stderr) => {
+        try {
+          if (err) {
+            try { logStartup('ipcTasklistError:' + (err && err.message)); } catch (e) {}
+          } else {
+            try { logStartup('ipcTasklist:' + stdout.replace(/\r?\n/g, ' || ')); } catch (e) {}
+          }
+        } catch (e) { /* ignore */ }
+      });
+
+      if (splashWindow && !splashWindow.isDestroyed()) {
+        try { splashWindow.destroy(); } catch (e) { /* ignore */ }
+      }
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        try { mainWindow.destroy(); } catch (e) { /* ignore */ }
+      }
+    } catch (e) { /* ignore */ }
+
+    // Give a moment and then trigger a silent install
+    setTimeout(() => {
+      try {
+        autoUpdater.quitAndInstall(true, restartImmediately);
+        try { app.quit(); } catch (e) { /* ignore */ }
+        setTimeout(() => {
+          try { process.exit(0); } catch (e) { /* ignore */ }
+        }, 1500);
+      } catch (err) {
+        // If this fails, report back to renderer
+        try { logStartup('ipcQuitAndInstallError:' + (err && err.message)); } catch (e) {}
+      }
+    }, 250);
     return { success: true };
   } catch (err) {
     return { success: false, error: err && err.message };
