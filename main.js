@@ -308,6 +308,17 @@ app.whenReady().then(async () => {
   logStartup(`initEnd:${initEnd}:${initEnd - initStart}`);
 
   // Create main window (hidden) and let it show when ready
+  // Before creating main window, run the blocking update check to avoid files-in-use during install
+  try {
+    const allowStart = await runBlockingUpdateCheck(15000);
+    if (!allowStart) {
+      // If allowStart is false, the app will be quitting to install an update. Stop initialization.
+      return;
+    }
+  } catch (e) {
+    log.error('Error during blocking update check:', e && e.message);
+  }
+
   createMainWindow();
 
   app.on('activate', () => {
@@ -364,10 +375,78 @@ app.whenReady().then(async () => {
         // Let the renderer prompt the user; renderer can call ipc to trigger quitAndInstall
       });
 
-      // Check for updates after a short delay so the app finishes startup first
-      setTimeout(() => {
-        try { autoUpdater.checkForUpdates().catch(e => log.error(e)); } catch (e) { log.error(e); }
-      }, 5000);
+      // Run a blocking update check before creating the main window.
+      // This ensures updates are applied (quit & install) before the app starts and locks files.
+      const runBlockingUpdateCheck = async (timeoutMs = 15000) => {
+        return new Promise((resolve) => {
+          let finished = false;
+
+          const finish = (allowStart = true) => {
+            if (finished) return;
+            finished = true;
+            // remove listeners we attached for the blocking flow
+            try {
+              autoUpdater.removeAllListeners('update-available');
+              autoUpdater.removeAllListeners('update-downloaded');
+              autoUpdater.removeAllListeners('update-not-available');
+              autoUpdater.removeAllListeners('error');
+            } catch (e) { /* ignore */ }
+            resolve(allowStart);
+          };
+
+          // If an update is available: wait for download then install immediately
+          autoUpdater.once('update-available', (info) => {
+            log.info('Blocking flow - update available:', info.version);
+            safeSend(splashWindow, 'update-available', info);
+
+            // When downloaded, quit and install so installer can replace files (no files-in-use)
+            autoUpdater.once('update-downloaded', (downloadedInfo) => {
+              log.info('Blocking flow - update downloaded:', downloadedInfo.version);
+              safeSend(splashWindow, 'update-downloaded', downloadedInfo);
+              try {
+                // quitAndInstall will quit the app and run installer; do not resolve the promise
+                autoUpdater.quitAndInstall(false, true);
+              } catch (e) {
+                log.error('quitAndInstall failed in blocking flow:', e && (e.stack || e).toString());
+                // allow startup if quitAndInstall fails
+                finish(true);
+              }
+            });
+          });
+
+          autoUpdater.once('update-not-available', (info) => {
+            log.info('Blocking flow - update not available');
+            safeSend(splashWindow, 'update-not-available', info);
+            finish(true);
+          });
+
+          autoUpdater.once('error', (err) => {
+            log.warn('Blocking flow - update error:', err == null ? 'unknown' : (err.stack || err).toString());
+            safeSend(splashWindow, 'update-error', { message: err && err.message });
+            // On error, proceed with startup to avoid blocking users
+            finish(true);
+          });
+
+          // Start check
+          try {
+            autoUpdater.checkForUpdates().catch(e => {
+              log.error('checkForUpdates() promise rejected in blocking flow:', e && e.message);
+              finish(true);
+            });
+          } catch (e) {
+            log.error('checkForUpdates() threw in blocking flow:', e && e.message);
+            finish(true);
+          }
+
+          // Fallback timeout: don't block startup longer than timeoutMs
+          setTimeout(() => {
+            log.warn('Blocking update check timed out; proceeding with startup');
+            finish(true);
+          }, timeoutMs);
+        });
+      };
+
+      // Kick off blocking update check right away (we await it after initialization below)
     }
   } catch (e) {
     console.warn('auto-updater not available in this environment', e && e.message);
