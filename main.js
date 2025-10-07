@@ -192,7 +192,8 @@ function createSplashWindow() {
     show: true,
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
@@ -314,30 +315,36 @@ app.whenReady().then(async () => {
       autoUpdater.on('checking-for-update', () => {
         log.info('Checking for update...');
         if (mainWindow) mainWindow.webContents.send('update-checking');
+        if (splashWindow) splashWindow.webContents.send('update-checking');
       });
 
       autoUpdater.on('update-available', (info) => {
         log.info('Update available:', info.version);
         if (mainWindow) mainWindow.webContents.send('update-available', info);
+        if (splashWindow) splashWindow.webContents.send('update-available', info);
       });
 
       autoUpdater.on('update-not-available', (info) => {
         log.info('Update not available');
         if (mainWindow) mainWindow.webContents.send('update-not-available', info);
+        if (splashWindow) splashWindow.webContents.send('update-not-available', info);
       });
 
       autoUpdater.on('error', (err) => {
         log.warn('Update error:', err == null ? 'unknown' : (err.stack || err).toString());
         if (mainWindow) mainWindow.webContents.send('update-error', { message: err && err.message });
+        if (splashWindow) splashWindow.webContents.send('update-error', { message: err && err.message });
       });
 
       autoUpdater.on('download-progress', (progress) => {
         if (mainWindow) mainWindow.webContents.send('update-progress', progress);
+        if (splashWindow) splashWindow.webContents.send('update-progress', progress);
       });
 
       autoUpdater.on('update-downloaded', (info) => {
         log.info('Update downloaded:', info.version);
         if (mainWindow) mainWindow.webContents.send('update-downloaded', info);
+        if (splashWindow) splashWindow.webContents.send('update-downloaded', info);
         // Let the renderer prompt the user; renderer can call ipc to trigger quitAndInstall
       });
 

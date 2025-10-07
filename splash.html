@@ -51,6 +51,10 @@
       </div>
 
       <div class="small">Loading resources — this may take a few seconds</div>
+      <div class="small" id="updateMsg" style="margin-top:12px;display:none"></div>
+      <div style="margin-top:8px; display:none" id="updateActions">
+        <button id="installBtn">Restart and install</button>
+      </div>
     </div>
 
     <script>
@@ -59,11 +63,49 @@
       let progress = 0;
       function tick() {
         progress += Math.random() * 12;
-        if (progress > 98) progress = 98;
+        if (progress > 80) progress = 80; // reserve final progress for actual update/main ready
         bar.style.width = progress + '%';
         setTimeout(tick, 400 + Math.random() * 400);
       }
       tick();
+
+      // Updater bindings (using exposed electronAPI from preload)
+      const updateMsg = document.getElementById('updateMsg');
+      const updateActions = document.getElementById('updateActions');
+      const installBtn = document.getElementById('installBtn');
+
+      if (window.electronAPI) {
+        window.electronAPI.onUpdateChecking(() => {
+          updateMsg.style.display = 'block';
+          updateMsg.textContent = 'Checking for updates...';
+        });
+
+        window.electronAPI.onUpdateAvailable((info) => {
+          updateMsg.style.display = 'block';
+          updateMsg.textContent = `Update available: ${info.version}. Downloading...`;
+        });
+
+        window.electronAPI.onUpdateProgress((progress) => {
+          updateMsg.style.display = 'block';
+          updateMsg.textContent = `Downloading update: ${Math.floor(progress.percent)}%`;
+          bar.style.width = Math.min(90, Math.floor(progress.percent)) + '%';
+        });
+
+        window.electronAPI.onUpdateDownloaded((info) => {
+          updateMsg.textContent = `Update ${info.version} ready.`;
+          bar.style.width = '100%';
+          updateActions.style.display = 'block';
+        });
+
+        window.electronAPI.onUpdateError((err) => {
+          updateMsg.style.display = 'block';
+          updateMsg.textContent = `Update failed: ${err && err.message ? err.message : err}`;
+        });
+
+        installBtn.addEventListener('click', () => {
+          window.electronAPI.installUpdate(true);
+        });
+      }
     </script>
   </body>
 </html>

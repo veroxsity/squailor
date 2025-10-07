@@ -42,4 +42,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('clear-summary-history'),
   onProcessingProgress: (callback) => 
     ipcRenderer.on('processing-progress', (event, data) => callback(data))
+  ,
+  // Updater API
+  onUpdateChecking: (callback) => ipcRenderer.on('update-checking', () => callback()),
+  onUpdateAvailable: (callback) => ipcRenderer.on('update-available', (event, info) => callback(info)),
+  onUpdateNotAvailable: (callback) => ipcRenderer.on('update-not-available', (event, info) => callback(info)),
+  onUpdateError: (callback) => ipcRenderer.on('update-error', (event, err) => callback(err)),
+  onUpdateProgress: (callback) => ipcRenderer.on('update-progress', (event, progress) => callback(progress)),
+  onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (event, info) => callback(info)),
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  installUpdate: (restartImmediately = true) => ipcRenderer.invoke('install-update', restartImmediately)
 });
