@@ -30,6 +30,22 @@ async function logStartup(message) {
   }
 }
 
+// Safely send IPC to a BrowserWindow if it and its webContents still exist
+function safeSend(win, channel, ...args) {
+  try {
+    if (!win) return false;
+    if (win.isDestroyed && win.isDestroyed()) return false;
+    const wc = win.webContents;
+    if (!wc) return false;
+    if (wc.isDestroyed && wc.isDestroyed()) return false;
+    wc.send(channel, ...args);
+    return true;
+  } catch (err) {
+    try { console.warn('safeSend failed', err && err.message); } catch (e) {}
+    return false;
+  }
+}
+
 // Default storage paths with new structure
 const defaultUserDataPath = app.getPath('userData');
 const defaultDataPath = path.join(defaultUserDataPath, 'data');
@@ -314,37 +330,37 @@ app.whenReady().then(async () => {
 
       autoUpdater.on('checking-for-update', () => {
         log.info('Checking for update...');
-        if (mainWindow) mainWindow.webContents.send('update-checking');
-        if (splashWindow) splashWindow.webContents.send('update-checking');
+        safeSend(mainWindow, 'update-checking');
+        safeSend(splashWindow, 'update-checking');
       });
 
       autoUpdater.on('update-available', (info) => {
         log.info('Update available:', info.version);
-        if (mainWindow) mainWindow.webContents.send('update-available', info);
-        if (splashWindow) splashWindow.webContents.send('update-available', info);
+        safeSend(mainWindow, 'update-available', info);
+        safeSend(splashWindow, 'update-available', info);
       });
 
       autoUpdater.on('update-not-available', (info) => {
         log.info('Update not available');
-        if (mainWindow) mainWindow.webContents.send('update-not-available', info);
-        if (splashWindow) splashWindow.webContents.send('update-not-available', info);
+        safeSend(mainWindow, 'update-not-available', info);
+        safeSend(splashWindow, 'update-not-available', info);
       });
 
       autoUpdater.on('error', (err) => {
         log.warn('Update error:', err == null ? 'unknown' : (err.stack || err).toString());
-        if (mainWindow) mainWindow.webContents.send('update-error', { message: err && err.message });
-        if (splashWindow) splashWindow.webContents.send('update-error', { message: err && err.message });
+        safeSend(mainWindow, 'update-error', { message: err && err.message });
+        safeSend(splashWindow, 'update-error', { message: err && err.message });
       });
 
       autoUpdater.on('download-progress', (progress) => {
-        if (mainWindow) mainWindow.webContents.send('update-progress', progress);
-        if (splashWindow) splashWindow.webContents.send('update-progress', progress);
+        safeSend(mainWindow, 'update-progress', progress);
+        safeSend(splashWindow, 'update-progress', progress);
       });
 
       autoUpdater.on('update-downloaded', (info) => {
         log.info('Update downloaded:', info.version);
-        if (mainWindow) mainWindow.webContents.send('update-downloaded', info);
-        if (splashWindow) splashWindow.webContents.send('update-downloaded', info);
+        safeSend(mainWindow, 'update-downloaded', info);
+        safeSend(splashWindow, 'update-downloaded', info);
         // Let the renderer prompt the user; renderer can call ipc to trigger quitAndInstall
       });
 
