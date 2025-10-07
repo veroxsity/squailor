@@ -152,6 +152,73 @@ async function loadStorageSettings() {
   }
 }
 
+// Update UI elements for updater
+const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
+const installUpdateBtn = document.getElementById('installUpdateBtn');
+const updateStatusDiv = document.getElementById('updateStatus');
+
+if (checkUpdatesBtn) {
+  checkUpdatesBtn.addEventListener('click', async () => {
+    if (updateStatusDiv) {
+      updateStatusDiv.textContent = 'Checking for updates...';
+    }
+    try {
+      const res = await window.electronAPI.checkForUpdates();
+      if (res && res.success) {
+        // actual events will be delivered via the update event handlers below
+        if (updateStatusDiv) updateStatusDiv.textContent = 'Check started...';
+      } else {
+        if (updateStatusDiv) updateStatusDiv.textContent = 'Failed to start update check';
+      }
+    } catch (err) {
+      if (updateStatusDiv) updateStatusDiv.textContent = `Error: ${err && err.message}`;
+    }
+  });
+}
+
+if (installUpdateBtn) {
+  installUpdateBtn.addEventListener('click', async () => {
+    if (updateStatusDiv) updateStatusDiv.textContent = 'Installing update...';
+    try {
+      await window.electronAPI.installUpdate(true);
+    } catch (err) {
+      if (updateStatusDiv) updateStatusDiv.textContent = `Install failed: ${err && err.message}`;
+    }
+  });
+}
+
+// Updater event handlers from preload (emits from main)
+if (window.electronAPI && window.electronAPI.onUpdateChecking) {
+  window.electronAPI.onUpdateChecking(() => {
+    if (updateStatusDiv) updateStatusDiv.textContent = 'Checking for updates...';
+    if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+  });
+
+  window.electronAPI.onUpdateAvailable((info) => {
+    if (updateStatusDiv) updateStatusDiv.textContent = `Update available: ${info.version} — downloading...`;
+    if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+  });
+
+  window.electronAPI.onUpdateProgress((progress) => {
+    if (updateStatusDiv) updateStatusDiv.textContent = `Downloading update: ${Math.round(progress.percent || 0)}% (${progress.bytesPerSecond ? (Math.round(progress.bytesPerSecond / 1024) + ' KB/s') : ''})`;
+  });
+
+  window.electronAPI.onUpdateDownloaded((info) => {
+    if (updateStatusDiv) updateStatusDiv.textContent = `Update downloaded: ${info.version}`;
+    if (installUpdateBtn) installUpdateBtn.style.display = 'inline-block';
+  });
+
+  window.electronAPI.onUpdateNotAvailable(() => {
+    if (updateStatusDiv) updateStatusDiv.textContent = 'No updates available';
+    if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+  });
+
+  window.electronAPI.onUpdateError((err) => {
+    if (updateStatusDiv) updateStatusDiv.textContent = `Update error: ${err && err.message}`;
+    if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+  });
+}
+
 async function updateStorageStats() {
   try {
     const stats = await window.electronAPI.getStorageStats();
