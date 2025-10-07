@@ -11,11 +11,18 @@ const semverRe = /^(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z-.]+)?)$/;
 function extractVersionAndForward(arr) {
   const ver = { version: null, forward: [] };
   for (const a of arr) {
-    if (!ver.version && semverRe.test(a)) {
-      ver.version = a;
-    } else {
-      ver.forward.push(a);
+    if (!ver.version) {
+      // Accept versions that start with 'v' or 'V' (e.g. v1.2.3)
+      if ((a.startsWith('v') || a.startsWith('V')) && semverRe.test(a.substring(1))) {
+        ver.version = a.substring(1);
+        continue;
+      }
+      if (semverRe.test(a)) {
+        ver.version = a;
+        continue;
+      }
     }
+    ver.forward.push(a);
   }
   return ver;
 }
