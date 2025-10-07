@@ -89,7 +89,9 @@ async function runBlockingUpdateCheck(timeoutMs = 15000) {
           try { logStartup('update-downloaded:' + downloadedInfo.version); } catch (e) {}
           safeSend(splashWindow, 'update-downloaded', downloadedInfo);
           try {
-            autoUpdater.quitAndInstall(false, true);
+            // Perform a silent install to avoid showing installer UI (Discord-like behavior)
+            // Parameters: isSilent = true, isForceRunAfter = true
+            autoUpdater.quitAndInstall(true, true);
           } catch (e) {
             log.error('quitAndInstall failed in blocking flow:', e && (e.stack || e).toString());
             finish(true);
@@ -387,6 +389,16 @@ function createMainWindow() {
 app.whenReady().then(async () => {
   // Show splash quickly so user gets feedback during potentially long startup
   createSplashWindow();
+
+  // Record runtime info immediately to help diagnose updater behavior
+  try {
+    try { await logStartup('appVersion:' + app.getVersion()); } catch (e) {}
+    try { await logStartup('execPath:' + process.execPath); } catch (e) {}
+    try { await logStartup('cwd:' + process.cwd()); } catch (e) {}
+    try { await logStartup('argv:' + process.argv.join(' ')); } catch (e) {}
+  } catch (e) {
+    console.warn('failed to write runtime startup logs', e && e.message);
+  }
 
   // Perform initialization while splash is visible
   const initStart = Date.now();
@@ -1362,7 +1374,8 @@ ipcMain.handle('install-update', async (event, restartImmediately = true) => {
   try {
     const { autoUpdater } = require('electron-updater');
     // Parameters: isSilent, isForceRunAfter
-    autoUpdater.quitAndInstall(false, restartImmediately);
+    // Use silent install when triggered from renderer as well
+    autoUpdater.quitAndInstall(true, restartImmediately);
     return { success: true };
   } catch (err) {
     return { success: false, error: err && err.message };
