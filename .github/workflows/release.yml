@@ -18,5 +18,10 @@ jobs:
       - name: Build and publish (Windows NSIS)
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: pwsh
         run: |
-          npm run build:installer ${{ github.ref_name }} -- --publish=always
+          # github.ref_name is like v1.0.1; strip leading 'v' if present
+          $tag = "${{ github.ref_name }}"
+          if ($tag.StartsWith('v')) { $tag = $tag.Substring(1) }
+          Write-Host "Publishing version: $tag"
+          npm run build:installer $tag -- --publish=always
