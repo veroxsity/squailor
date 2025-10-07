@@ -17,7 +17,7 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build and publish (Windows NSIS)
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
         shell: pwsh
         run: |
           # github.ref_name is like v1.0.1; strip leading 'v' if present
