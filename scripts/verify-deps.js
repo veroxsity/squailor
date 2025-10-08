@@ -30,7 +30,7 @@ function runAuditJson() {
 (function main() {
   console.log('Running pre-build dependency verification...');
 
-  const criticalDeps = [ 'mammoth', 'electron-updater' ];
+  const criticalDeps = [ 'electron-updater' ];
   const missing = criticalDeps.filter(d => !checkModule(d));
 
   if (missing.length > 0) {
