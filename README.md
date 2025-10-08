@@ -4,7 +4,13 @@ An AI-powered Electron app that summarizes PowerPoint presentations and PDF docu
 
 ## Features
 
-- 📄 **Multi-format Support**: Process PDF and PowerPoint (PPTX/PPT) files
+- 📄 **Multi-format Support**: Supports common document types
+
+### Supported document types
+
+- PDF (.pdf)
+- PowerPoint (.pptx, .ppt)
+- Word (.docx, .doc) — .docx is fully supported; .doc (binary) has limited support and may be less reliable. We recommend using .docx when possible.
 - 🤖 **AI-Powered Summaries**: Uses OpenAI's GPT models for intelligent summarization
 - 📝 **Two Summary Modes**:
   - **Normal Mode**: Detailed summaries that help you learn and understand content

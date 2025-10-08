@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 // Lazy-loaded heavy modules (required on demand to speed up app startup)
 let pdfParse;
 let parsePresentation;
+let parseDocx;
 let summarizeText;
 let encrypt;
 let decrypt;
@@ -544,7 +545,8 @@ ipcMain.handle('select-file', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openFile', 'multiSelections'],
     filters: [
-      { name: 'Documents', extensions: ['pdf', 'pptx', 'ppt'] },
+      { name: 'Documents', extensions: ['pdf', 'pptx', 'ppt', 'docx', 'doc'] },
+      { name: 'Word Documents', extensions: ['docx', 'doc'] },
       { name: 'PDF Files', extensions: ['pdf'] },
       { name: 'PowerPoint Files', extensions: ['pptx', 'ppt'] }
     ]
@@ -680,7 +682,7 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
         fileName,
         fileIndex: i + 1,
         totalFiles,
-        status: ext === '.pdf' ? 'Extracting text from PDF...' : 'Extracting text from PowerPoint...',
+        status: ext === '.pdf' ? 'Extracting text from PDF...' : (ext === '.docx' || ext === '.doc') ? 'Extracting text from Word document...' : 'Extracting text from PowerPoint...',
         stage: 'extracting'
       });
       
@@ -688,7 +690,13 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
         const dataBuffer = await fs.readFile(filePath);
         const pdfData = await pdfParse(dataBuffer);
         text = pdfData.text;
-      } else if (ext === '.pptx' || ext === '.ppt') {
+        } else if (ext === '.docx' || ext === '.doc') {
+            // Lazy-load DOCX parser
+            if (!parseDocx) {
+              parseDocx = require('./utils/docxParser').parseDocx;
+            }
+            text = await parseDocx(filePath);
+          } else if (ext === '.pptx' || ext === '.ppt') {
         text = await parsePresentation(filePath);
       }
 
@@ -1002,6 +1010,8 @@ function getMimeType(fileName) {
     '.pdf': 'application/pdf',
     '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
     '.ppt': 'application/vnd.ms-powerpoint'
+    , '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    , '.doc': 'application/msword'
   };
   return mimeTypes[ext] || 'application/octet-stream';
 }
