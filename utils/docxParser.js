@@ -1,5 +1,12 @@
 const fs = require('fs').promises;
-const mammoth = require('mammoth');
+// Try to require mammoth, but fail gracefully with a helpful message
+let mammoth;
+try {
+  mammoth = require('mammoth');
+} catch (err) {
+  // Leave mammoth undefined; parseDocx will throw a clear error when called
+  mammoth = null;
+}
 
 /**
  * Extract text from a DOCX file using mammoth
@@ -7,6 +14,9 @@ const mammoth = require('mammoth');
  */
 async function parseDocx(filePath) {
   try {
+    if (!mammoth) {
+      throw new Error('Missing dependency "mammoth". Run `npm install` in the project root or reinstall the packaged app so the dependency is available.');
+    }
     const buffer = await fs.readFile(filePath);
     // mammoth accepts a Buffer or ArrayBuffer; pass the node Buffer
     const result = await mammoth.extractRawText({ buffer });

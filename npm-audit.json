@@ -1,0 +1,484 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@jimp/core": {
+      "name": "@jimp/core",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "load-bmfont",
+        "phin"
+      ],
+      "effects": [
+        "@jimp/custom"
+      ],
+      "range": "<=0.21.4--canary.1163.d07ed6254d130e2995d24101e93427ec091016e6.0",
+      "nodes": [
+        "node_modules/@jimp/core"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@jimp/custom": {
+      "name": "@jimp/custom",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "@jimp/core"
+      ],
+      "effects": [
+        "jimp"
+      ],
+      "range": "<=0.21.4--canary.1163.d07ed6254d130e2995d24101e93427ec091016e6.0",
+      "nodes": [
+        "node_modules/@jimp/custom"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@jimp/plugin-print": {
+      "name": "@jimp/plugin-print",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "load-bmfont"
+      ],
+      "effects": [
+        "@jimp/plugins"
+      ],
+      "range": "<=0.22.12",
+      "nodes": [
+        "node_modules/@jimp/plugin-print"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@jimp/plugins": {
+      "name": "@jimp/plugins",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@jimp/plugin-print"
+      ],
+      "effects": [
+        "jimp"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/@jimp/plugins"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "css-loader": {
+      "name": "css-loader",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "icss-utils",
+        "postcss",
+        "postcss-modules-extract-imports",
+        "postcss-modules-local-by-default",
+        "postcss-modules-scope",
+        "postcss-modules-values"
+      ],
+      "effects": [],
+      "range": "0.15.0 - 4.3.0",
+      "nodes": [
+        "node_modules/css-loader"
+      ],
+      "fixAvailable": true
+    },
+    "electron-updater": {
+      "name": "electron-updater",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1098458,
+          "name": "electron-updater",
+          "dependency": "electron-updater",
+          "title": "electron-updater Code Signing Bypass on Windows",
+          "url": "https://github.com/advisories/GHSA-9jxc-qjr9-vjxq",
+          "severity": "high",
+          "cwe": [
+            "CWE-154",
+            "CWE-295"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:U/C:H/I:H/A:H"
+          },
+          "range": "<=6.3.0-alpha.5"
+        }
+      ],
+      "effects": [],
+      "range": "<=6.3.0-alpha.5",
+      "nodes": [
+        "node_modules/electron-updater"
+      ],
+      "fixAvailable": {
+        "name": "electron-updater",
+        "version": "6.6.2",
+        "isSemVerMajor": true
+      }
+    },
+    "global": {
+      "name": "global",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "min-document"
+      ],
+      "effects": [
+        "xhr"
+      ],
+      "range": ">=2.0.3",
+      "nodes": [
+        "node_modules/global"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "icss-utils": {
+      "name": "icss-utils",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "postcss"
+      ],
+      "effects": [
+        "css-loader",
+        "postcss-modules-local-by-default",
+        "postcss-modules-values"
+      ],
+      "range": "<=4.1.1",
+      "nodes": [
+        "node_modules/icss-utils"
+      ],
+      "fixAvailable": true
+    },
+    "jimp": {
+      "name": "jimp",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "@jimp/custom",
+        "@jimp/plugins"
+      ],
+      "effects": [],
+      "range": "0.3.6-alpha.5 - 0.22.12",
+      "nodes": [
+        "node_modules/jimp"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "jszip": {
+      "name": "jszip",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1094050,
+          "name": "jszip",
+          "dependency": "jszip",
+          "title": "jszip Vulnerable to Prototype Pollution",
+          "url": "https://github.com/advisories/GHSA-jg8v-48h5-wgxg",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<2.7.0"
+        },
+        {
+          "source": 1100538,
+          "name": "jszip",
+          "dependency": "jszip",
+          "title": "JSZip contains Path Traversal via loadAsync",
+          "url": "https://github.com/advisories/GHSA-36fh-84j7-cv5h",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-22"
+          ],
+          "cvss": {
+            "score": 7.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:L/A:L"
+          },
+          "range": "<3.8.0"
+        }
+      ],
+      "effects": [
+        "pptx-parser"
+      ],
+      "range": "<=3.7.1",
+      "nodes": [
+        "node_modules/pptx-parser/node_modules/jszip"
+      ],
+      "fixAvailable": false
+    },
+    "load-bmfont": {
+      "name": "load-bmfont",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "xhr"
+      ],
+      "effects": [
+        "@jimp/core",
+        "@jimp/plugin-print"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/load-bmfont"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "min-document": {
+      "name": "min-document",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1108264,
+          "name": "min-document",
+          "dependency": "min-document",
+          "title": "min-document vulnerable to prototype pollution",
+          "url": "https://github.com/advisories/GHSA-rx8g-88g5-qh64",
+          "severity": "low",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<=2.19.0"
+        }
+      ],
+      "effects": [
+        "global"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/min-document"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "phin": {
+      "name": "phin",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1096967,
+          "name": "phin",
+          "dependency": "phin",
+          "title": "phin may include sensitive headers in subsequent requests after redirect",
+          "url": "https://github.com/advisories/GHSA-x565-32qp-m3vf",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-200"
+          ],
+          "cvss": {
+            "score": 4.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:N"
+          },
+          "range": "<3.7.1"
+        }
+      ],
+      "effects": [
+        "@jimp/core"
+      ],
+      "range": "<3.7.1",
+      "nodes": [
+        "node_modules/phin"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    },
+    "postcss": {
+      "name": "postcss",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1094544,
+          "name": "postcss",
+          "dependency": "postcss",
+          "title": "PostCSS line return parsing error",
+          "url": "https://github.com/advisories/GHSA-7fh5-64p2-3v2j",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-74",
+            "CWE-144"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+          },
+          "range": "<8.4.31"
+        }
+      ],
+      "effects": [
+        "css-loader",
+        "icss-utils",
+        "postcss-modules-extract-imports",
+        "postcss-modules-local-by-default",
+        "postcss-modules-scope",
+        "postcss-modules-values"
+      ],
+      "range": "<8.4.31",
+      "nodes": [
+        "node_modules/postcss"
+      ],
+      "fixAvailable": true
+    },
+    "postcss-modules-extract-imports": {
+      "name": "postcss-modules-extract-imports",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "postcss"
+      ],
+      "effects": [],
+      "range": "<=2.0.0",
+      "nodes": [
+        "node_modules/postcss-modules-extract-imports"
+      ],
+      "fixAvailable": true
+    },
+    "postcss-modules-local-by-default": {
+      "name": "postcss-modules-local-by-default",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "icss-utils",
+        "postcss"
+      ],
+      "effects": [],
+      "range": "<=4.0.0-rc.4",
+      "nodes": [
+        "node_modules/postcss-modules-local-by-default"
+      ],
+      "fixAvailable": true
+    },
+    "postcss-modules-scope": {
+      "name": "postcss-modules-scope",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "postcss"
+      ],
+      "effects": [],
+      "range": "<=2.2.0",
+      "nodes": [
+        "node_modules/postcss-modules-scope"
+      ],
+      "fixAvailable": true
+    },
+    "postcss-modules-values": {
+      "name": "postcss-modules-values",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        "icss-utils",
+        "postcss"
+      ],
+      "effects": [
+        "css-loader"
+      ],
+      "range": "<=4.0.0-rc.5",
+      "nodes": [
+        "node_modules/postcss-modules-values"
+      ],
+      "fixAvailable": true
+    },
+    "pptx-parser": {
+      "name": "pptx-parser",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        "css-loader",
+        "jszip"
+      ],
+      "effects": [],
+      "range": "*",
+      "nodes": [
+        "node_modules/pptx-parser"
+      ],
+      "fixAvailable": false
+    },
+    "xhr": {
+      "name": "xhr",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "global"
+      ],
+      "effects": [
+        "load-bmfont"
+      ],
+      "range": ">=1.2.3",
+      "nodes": [
+        "node_modules/xhr"
+      ],
+      "fixAvailable": {
+        "name": "jimp",
+        "version": "1.6.0",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 6,
+      "moderate": 13,
+      "high": 1,
+      "critical": 0,
+      "total": 20
+    },
+    "dependencies": {
+      "prod": 253,
+      "dev": 422,
+      "optional": 58,
+      "peer": 79,
+      "peerOptional": 0,
+      "total": 752
+    }
+  }
+}

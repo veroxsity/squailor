@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const Jimp = require('jimp');
+const { Jimp } = require('jimp');
 
 // Source and target
 const src = path.join(__dirname, '..', 'assets', 'icon.png');
@@ -17,12 +17,12 @@ async function main() {
   if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir);
 
   try {
-    const image = await Jimp.read(src);
+  const image = await Jimp.read(src);
 
     for (const size of sizes) {
       const out = path.join(tmpDir, `icon_${size}.png`);
       tmpFiles.push(out);
-      await image.clone().resize(size, size, Jimp.RESIZE_BILINEAR).writeAsync(out);
+  await image.clone().resize({ w: size, h: size, mode: Jimp.RESIZE_BILINEAR }).write(out);
       console.log('Wrote', out);
     }
 
@@ -40,9 +40,9 @@ async function main() {
     let offset = 6 + (16 * count);
     for (let i = 0; i < count; i++) {
       const buf = buffers[i];
-      const img = await Jimp.read(tmpFiles[i]);
-      const w = img.bitmap.width >= 256 ? 0 : img.bitmap.width;
-      const h = img.bitmap.height >= 256 ? 0 : img.bitmap.height;
+  const img = await Jimp.read(tmpFiles[i]);
+  const w = img.width >= 256 ? 0 : img.width;
+  const h = img.height >= 256 ? 0 : img.height;
       const entry = Buffer.alloc(16);
       entry.writeUInt8(w, 0); // width
       entry.writeUInt8(h, 1); // height
