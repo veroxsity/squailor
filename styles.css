@@ -1432,8 +1432,10 @@ body {
    This avoids rotating the entire status element (which contains text), and instead renders
    a dedicated spinner using a ::before pseudo-element. */
 
+
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  from { transform: translateY(-50%) rotate(0deg); }
+  to   { transform: translateY(-50%) rotate(360deg); }
 }
 
 .status-message.loading {
@@ -1446,7 +1448,7 @@ body {
   position: absolute;
   left: 12px;
   top: 50%;
-  transform: translateY(-50%);
+  transform: translateY(-50%) rotate(0deg);
   width: 16px;
   height: 16px;
   border: 2px solid rgba(255, 255, 255, 0.3);
@@ -2182,6 +2184,39 @@ body {
   font-size: 0.875rem;
 }
 
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+}
+
+.toast {
+  min-width: 220px;
+  max-width: 420px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+  opacity: 0;
+  transform: translateY(12px);
+  animation: toast-in 240ms forwards;
+}
+
+.toast.success { background: linear-gradient(90deg, #10b981, #059669); }
+.toast.error { background: linear-gradient(90deg, #ef4444, #dc2626); }
+.toast.info { background: linear-gradient(90deg, #667eea, #764ba2); }
+
+@keyframes toast-in {
+  to { opacity: 1; transform: translateY(0); }
+}
+
+
 /* Empty State */
 .empty-state {
   text-align: center;
@@ -2605,6 +2640,20 @@ body {
   justify-content: flex-end;
   gap: 12px;
 }
+
+/* Compact confirm modal */
+.modal-content.small {
+  width: 420px;
+  max-width: 90%;
+  padding: 16px;
+}
+
+#confirmModal .modal-body {
+  padding: 16px;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
 
 /* Responsive Modal */
 @media (max-width: 768px) {

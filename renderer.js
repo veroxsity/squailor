@@ -60,6 +60,54 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 });
 
+// Toast helper
+function showToast(message, type = 'info', timeout = 4000) {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'opacity 200ms, transform 200ms';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(12px)';
+    setTimeout(() => container.removeChild(toast), 220);
+  }, timeout);
+}
+
+// Confirm dialog helper (returns Promise<boolean>)
+function showConfirm(message) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal');
+    const body = document.getElementById('confirmModalBody');
+    const okBtn = document.getElementById('confirmOkBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+    if (!modal || !body || !okBtn || !cancelBtn) {
+      resolve(false);
+      return;
+    }
+    body.textContent = message;
+    modal.style.display = 'block';
+
+    function cleanup() {
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      window.removeEventListener('keydown', onKeydown);
+      modal.style.display = 'none';
+    }
+
+    function onOk() { cleanup(); resolve(true); }
+    function onCancel() { cleanup(); resolve(false); }
+    function onKeydown(e) { if (e.key === 'Escape') { cleanup(); resolve(false); } }
+
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    window.addEventListener('keydown', onKeydown);
+    okBtn.focus();
+  });
+}
+
 // Navigation
 const navItems = document.querySelectorAll('.nav-item');
 const pages = document.querySelectorAll('.page');
@@ -411,12 +459,12 @@ function getSummaryStyle() {
 if (processFilesBtn && resultsDiv && resultsSection) {
   processFilesBtn.addEventListener('click', async () => {
     if (!apiKey) {
-      alert('Please save your OpenAI API key first!');
+      showToast('Please save your OpenRouter API key first!', 'error');
       return;
     }
 
     if (selectedFiles.length === 0) {
-      alert('Please select files to process!');
+      showToast('Please select files to process!', 'error');
       return;
     }
 
@@ -552,7 +600,7 @@ if (processFilesBtn && resultsDiv && resultsSection) {
       selectedFiles = [];
       renderFileList();
     } catch (error) {
-      alert(`Error processing documents: ${error.message}`);
+      showToast(`Error processing documents: ${error.message}`, 'error');
     } finally {
       processFilesBtn.disabled = false;
       processFilesBtn.innerHTML = '<span class="btn-icon">🚀</span><span>Generate Summaries</span>';
@@ -729,9 +777,9 @@ window.saveSummary = async (index, fileName) => {
   );
 
   if (saveResult.success) {
-    alert('Summary saved successfully!');
+    showToast('Summary saved successfully!', 'success');
   } else if (saveResult.error) {
-    alert(`Error saving summary: ${saveResult.error}`);
+    showToast(`Error saving summary: ${saveResult.error}`, 'error');
   }
 };
 
@@ -871,30 +919,92 @@ function updateHistoryStats() {
 }
 
 async function deleteHistoryItem(index) {
-  if (confirm('Are you sure you want to delete this history item?')) {
-    const item = summaryHistory[index];
-    
-    // Delete the folder containing the document and summary
-    if (item.folderId) {
-      await window.electronAPI.deleteSummaryFromHistory(item.folderId);
-    }
-    
-    // Reload history from disk
-    const result = await window.electronAPI.getSummaryHistory();
-    if (result.success) {
-      summaryHistory = result.history;
-    }
-    renderHistory();
+  const ok = await showConfirm('Are you sure you want to delete this history item?');
+  if (!ok) return;
+  const item = summaryHistory[index];
+
+  // Delete the folder containing the document and summary
+  if (item.folderId) {
+    await window.electronAPI.deleteSummaryFromHistory(item.folderId);
   }
+
+  // Reload history from disk
+  const result = await window.electronAPI.getSummaryHistory();
+  if (result.success) {
+    summaryHistory = result.history;
+  }
+  renderHistory();
 }
 
 function copyHistorySummary(index) {
   const item = summaryHistory[index];
   navigator.clipboard.writeText(item.summary).then(() => {
-    alert('Summary copied to clipboard!');
+    showToast('Summary copied to clipboard!', 'success');
   }).catch(err => {
-    alert('Failed to copy: ' + err.message);
+    showToast('Failed to copy: ' + err.message, 'error');
   });
+}
+
+// Copy summary from the completion modal results
+function copyResultSummary(event, index) {
+  // prevent parent card onclick from firing
+  event.stopPropagation();
+  const result = window.currentResults && window.currentResults[index];
+  if (!result || !result.success) return;
+  navigator.clipboard.writeText(result.summary).then(() => {
+    showToast('Summary copied to clipboard!', 'success');
+  }).catch(err => {
+    showToast('Failed to copy: ' + err.message, 'error');
+  });
+}
+
+// Download a result summary as .md or .txt
+function downloadResultSummary(event, index, format = 'txt') {
+  event.stopPropagation();
+  const result = window.currentResults && window.currentResults[index];
+  if (!result || !result.success) return;
+
+  const baseName = result.fileName.replace(/\.[^/.]+$/, '') + '_summary';
+  let content = '';
+  if (format === 'md') {
+    content = `# Summary for ${result.fileName}\n\n${result.summary}`;
+  } else {
+    content = `Summary for ${result.fileName}\n\n${result.summary}`;
+  }
+
+  const blob = new Blob([content], { type: format === 'md' ? 'text/markdown' : 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${baseName}.${format}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// Use Web Share API when available, otherwise fall back to copying link/text
+function shareResultSummary(event, index) {
+  event.stopPropagation();
+  const result = window.currentResults && window.currentResults[index];
+  if (!result || !result.success) return;
+
+  const text = `Summary for ${result.fileName}\n\n${result.summary}`;
+  if (navigator.share) {
+    navigator.share({
+      title: `Summary: ${result.fileName}`,
+      text
+    }).catch(err => {
+      showToast('Share failed: ' + err.message, 'error');
+    });
+  } else {
+    // Fallback: copy to clipboard and notify user
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('Summary copied to clipboard (share fallback).', 'info');
+    }).catch(err => {
+      showToast('Share not available and copy failed: ' + err.message, 'error');
+    });
+  }
 }
 
 function exportHistoryItem(index) {
@@ -1006,18 +1116,19 @@ function viewFullSummary(index) {
 }
 
 // Clear History
+// Clear History
 if (clearHistoryBtn) {
   clearHistoryBtn.addEventListener('click', async () => {
-    if (confirm('Are you sure you want to clear all history? This cannot be undone.')) {
-      await window.electronAPI.clearSummaryHistory();
-      
-      // Reload history from disk (should be empty now)
-      const result = await window.electronAPI.getSummaryHistory();
-      if (result.success) {
-        summaryHistory = result.history;
-      }
-      renderHistory();
+    const ok = await showConfirm('Are you sure you want to clear all history? This cannot be undone.');
+    if (!ok) return;
+    await window.electronAPI.clearSummaryHistory();
+    
+    // Reload history from disk (should be empty now)
+    const result = await window.electronAPI.getSummaryHistory();
+    if (result.success) {
+      summaryHistory = result.history;
     }
+    renderHistory();
   });
 }
 
@@ -1030,7 +1141,9 @@ window.viewFullSummary = viewFullSummary;
 // Summary View Page Controls
 const backFromSummaryBtn = document.getElementById('backFromSummary');
 const copySummaryViewBtn = document.getElementById('copySummaryView');
-const exportSummaryViewBtn = document.getElementById('exportSummaryView');
+const exportSummaryMDBtn = document.getElementById('exportSummaryMD');
+const exportSummaryTXTBtn = document.getElementById('exportSummaryTXT');
+const shareSummaryViewBtn = document.getElementById('shareSummaryView');
 
 if (backFromSummaryBtn) {
   backFromSummaryBtn.addEventListener('click', () => {
@@ -1047,10 +1160,54 @@ if (copySummaryViewBtn) {
   });
 }
 
-if (exportSummaryViewBtn) {
-  exportSummaryViewBtn.addEventListener('click', () => {
+if (exportSummaryMDBtn) {
+  exportSummaryMDBtn.addEventListener('click', () => {
+    if (typeof window.currentSummaryIndex !== 'undefined') {
+      // Download markdown version
+      const idx = window.currentSummaryIndex;
+      const item = summaryHistory[idx];
+      if (!item) return;
+      const baseName = item.fileName.replace(/\.[^/.]+$/, '') + '_summary';
+      const content = `# Summary for ${item.fileName}\n\n${item.summary}`;
+      const blob = new Blob([content], { type: 'text/markdown' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${baseName}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  });
+}
+
+if (exportSummaryTXTBtn) {
+  exportSummaryTXTBtn.addEventListener('click', () => {
     if (typeof window.currentSummaryIndex !== 'undefined') {
       exportHistoryItem(window.currentSummaryIndex);
+    }
+  });
+}
+
+if (shareSummaryViewBtn) {
+  shareSummaryViewBtn.addEventListener('click', () => {
+    if (typeof window.currentSummaryIndex !== 'undefined') {
+      const idx = window.currentSummaryIndex;
+      const item = summaryHistory[idx];
+      if (!item) return;
+      const text = `Summary for ${item.fileName}\n\n${item.summary}`;
+      if (navigator.share) {
+        navigator.share({ title: `Summary: ${item.fileName}`, text }).catch(err => {
+          showToast('Share failed: ' + err.message, 'error');
+        });
+      } else {
+        navigator.clipboard.writeText(text).then(() => {
+          showToast('Summary copied to clipboard (share fallback).', 'info');
+        }).catch(err => {
+          showToast('Share not available and copy failed: ' + err.message, 'error');
+        });
+      }
     }
   });
 }

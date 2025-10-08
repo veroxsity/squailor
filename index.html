@@ -335,12 +335,10 @@
                 </div>
               </div>
               <div class="summary-view-actions">
-                <button class="icon-btn" id="copySummaryView" title="Copy Summary">
-                  📋
-                </button>
-                <button class="icon-btn" id="exportSummaryView" title="Export Summary">
-                  💾
-                </button>
+                <button class="btn btn-outline btn-small" id="copySummaryView">Copy</button>
+                <button class="btn btn-outline btn-small" id="exportSummaryMD">MD</button>
+                <button class="btn btn-outline btn-small" id="exportSummaryTXT">TXT</button>
+                <button class="btn btn-outline btn-small" id="shareSummaryView">Share</button>
               </div>
             </div>
             
@@ -643,5 +641,17 @@
   </div>
 
   <script src="renderer.js"></script>
+  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+  <!-- Confirm Modal -->
+  <div id="confirmModal" class="modal" style="display:none;">
+    <div class="modal-overlay"></div>
+    <div class="modal-content small">
+      <div class="modal-body" id="confirmModalBody">Are you sure?</div>
+      <div class="modal-footer">
+        <button id="confirmCancelBtn" class="btn btn-outline">Cancel</button>
+        <button id="confirmOkBtn" class="btn btn-success">Confirm</button>
+      </div>
+    </div>
+  </div>
 </body>
 </html>
