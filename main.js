@@ -108,11 +108,9 @@ async function runBlockingUpdateCheck(timeoutMs = 15000) {
               });
             } catch (e) { /* ignore */ }
 
-            // Attempt to force-close any windows we created so file handles are released
+            // Attempt to close the main window so file handles are released.
+            // Keep the splashWindow visible to show update progress until the process exits.
             try {
-              if (splashWindow && !splashWindow.isDestroyed()) {
-                try { splashWindow.destroy(); } catch (e) { /* ignore */ }
-              }
               if (mainWindow && !mainWindow.isDestroyed()) {
                 try { mainWindow.destroy(); } catch (e) { /* ignore */ }
               }
@@ -1444,9 +1442,8 @@ ipcMain.handle('install-update', async (event, restartImmediately = true) => {
         } catch (e) { /* ignore */ }
       });
 
-      if (splashWindow && !splashWindow.isDestroyed()) {
-        try { splashWindow.destroy(); } catch (e) { /* ignore */ }
-      }
+      // Close only the main window to release document file handles. Leave the splash visible
+      // so the user sees update progress until the process exits and installer runs.
       if (mainWindow && !mainWindow.isDestroyed()) {
         try { mainWindow.destroy(); } catch (e) { /* ignore */ }
       }
