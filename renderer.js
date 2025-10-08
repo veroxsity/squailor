@@ -241,7 +241,7 @@ if (saveStorageLocationBtn) {
     }
     
     if (storageStatus) {
-      storageStatus.textContent = '⏳ Changing storage location and moving files...';
+      storageStatus.textContent = 'Changing storage location and moving files...';
       storageStatus.className = 'status-message loading';
       storageStatus.style.display = 'block';
     }
@@ -314,7 +314,7 @@ if (saveApiKeyBtn && apiKeyInput && apiKeyStatus) {
       return;
     }
 
-    apiKeyStatus.textContent = '⏳ Validating API key...';
+  apiKeyStatus.textContent = 'Validating API key...';
     apiKeyStatus.className = 'status-message loading';
     apiKeyStatus.style.display = 'block';
 
