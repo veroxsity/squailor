@@ -729,7 +729,45 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
       });
 
       // Summarize using AI with tone and style
-      const summary = await summarizeText(text, summaryType, apiKey, responseTone, model, summaryStyle);
+      const summary = await summarizeText(
+        text,
+        summaryType,
+        apiKey,
+        responseTone,
+        model,
+        summaryStyle,
+        (progress) => {
+          if (!progress) return;
+          // forward streaming deltas to renderer per-file
+          if (progress.type === 'delta') {
+            event.sender.send('processing-progress', {
+              fileName,
+              fileIndex: i + 1,
+              totalFiles,
+              status: 'Generating AI summary…',
+              stage: 'summarizing',
+              delta: progress.deltaText,
+              summarizedChars: progress.totalChars
+            });
+          } else if (progress.type === 'chunk-start' || progress.type === 'chunk-done' || progress.type === 'combine-start') {
+            event.sender.send('processing-progress', {
+              fileName,
+              fileIndex: i + 1,
+              totalFiles,
+              status: progress.type === 'chunk-start' ? `Summarizing part ${progress.chunkIndex}/${progress.totalChunks}…` : (progress.type === 'chunk-done' ? `Finished part ${progress.chunkIndex}/${progress.totalChunks}` : 'Combining parts…'),
+              stage: 'summarizing'
+            });
+          } else if (progress.type === 'done') {
+            event.sender.send('processing-progress', {
+              fileName,
+              fileIndex: i + 1,
+              totalFiles,
+              status: 'Summary generated',
+              stage: 'saving'
+            });
+          }
+        }
+      );
       
       // Save summary
       event.sender.send('processing-progress', {
@@ -948,7 +986,41 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
 
   let combinedSummary;
   try {
-    combinedSummary = await summarizeText(combinedText, summaryType, apiKey, responseTone, model, summaryStyle);
+    combinedSummary = await summarizeText(
+      combinedText,
+      summaryType,
+      apiKey,
+      responseTone,
+      model,
+      summaryStyle,
+      (progress) => {
+        // For combined mode, forward progress per original source (first fileIndex for visuals)
+        if (!progress) return;
+        const idx = 1;
+        if (progress.type === 'delta') {
+          extracted.forEach((info, k) => {
+            event.sender.send('processing-progress', {
+              fileName: info.fileName,
+              fileIndex: k + 1,
+              totalFiles,
+              status: 'Generating combined AI summary…',
+              stage: 'summarizing',
+              delta: progress.deltaText
+            });
+          });
+        } else if (progress.type === 'chunk-start' || progress.type === 'chunk-done' || progress.type === 'combine-start') {
+          extracted.forEach((info, k) => {
+            event.sender.send('processing-progress', {
+              fileName: info.fileName,
+              fileIndex: k + 1,
+              totalFiles,
+              status: progress.type === 'chunk-start' ? `Summarizing part ${progress.chunkIndex}/${progress.totalChunks}…` : (progress.type === 'chunk-done' ? `Finished part ${progress.chunkIndex}/${progress.totalChunks}` : 'Combining parts…'),
+              stage: 'summarizing'
+            });
+          });
+        }
+      }
+    );
   } catch (error) {
     let displayMessage = error.message || 'AI summarization failed';
     event.sender.send('processing-progress', {

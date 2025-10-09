@@ -520,7 +520,7 @@ if (processFilesBtn && resultsDiv && resultsSection) {
         const statusElement = document.getElementById(`file-status-${fileIndex}`);
         const progressElement = document.getElementById(`file-progress-${fileIndex}`);
         
-        if (statusElement) {
+  if (statusElement) {
           // Get stage emoji and color
           const stageConfig = {
             'init': { emoji: '🔄', color: '#667eea' },
@@ -573,6 +573,22 @@ if (processFilesBtn && resultsDiv && resultsSection) {
           statusElement.textContent = statusText;
           statusElement.style.color = config.color;
           statusElement.style.fontWeight = '500';
+          // Optional: show a brief ticker when AI is streaming
+          if (data.stage === 'summarizing' && data.delta) {
+            let ticker = statusElement.nextElementSibling;
+            const id = `ai-ticker-${fileIndex}`;
+            if (!ticker || !ticker.classList || !ticker.classList.contains('ai-ticker')) {
+              ticker = document.createElement('div');
+              ticker.className = 'ai-ticker';
+              ticker.style.fontSize = '0.8rem';
+              ticker.style.color = 'var(--text-secondary)';
+              ticker.style.marginTop = '6px';
+              ticker.id = id;
+              statusElement.parentNode.insertBefore(ticker, statusElement.nextSibling);
+            }
+            // Keep ticker to a reasonable size
+            ticker.textContent = (ticker.textContent + data.delta).slice(-180);
+          }
           
           // For rate limit errors, make the text wrap properly
           if (data.errorType === 'rate-limit') {

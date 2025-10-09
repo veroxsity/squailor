@@ -10,7 +10,8 @@ const OpenAI = require('openai');
  * @param {string} summaryStyle - Style of summary ('teaching' or 'notes')
  * @returns {Promise<string>} - Summary text
  */
-async function summarizeText(text, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching') {
+// onProgress: optional callback({ type: 'delta'|'chunk-start'|'chunk-done'|'combine-start'|'done', deltaText?, totalChars? , chunkIndex?, totalChunks? })
+async function summarizeText(text, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', onProgress = null) {
   // Configure OpenAI SDK to use OpenRouter
   const openai = new OpenAI({
     apiKey: apiKey,
@@ -245,17 +246,46 @@ ${text}`;
         maxTokens = 8000; // Much higher for longer, comprehensive summaries
       }
       
-      const response = await openai.chat.completions.create({
-        model: model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.3,
-        max_tokens: maxTokens
-      });
+      // Try streaming for live feedback; fallback to non-streaming if not supported
+      let full = '';
+      try {
+        const stream = await openai.chat.completions.create({
+          model: model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3,
+          max_tokens: maxTokens,
+          stream: true
+        });
 
-      return response.choices[0].message.content.trim();
+        for await (const part of stream) {
+          const delta = part?.choices?.[0]?.delta?.content || '';
+          if (delta) {
+            full += delta;
+            if (typeof onProgress === 'function') {
+              onProgress({ type: 'delta', deltaText: delta, totalChars: full.length });
+            }
+          }
+        }
+        if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: full.length });
+        return full.trim();
+      } catch (e) {
+        // Fallback to non-streaming
+        const response = await openai.chat.completions.create({
+          model: model,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.3,
+          max_tokens: maxTokens
+        });
+        full = response.choices[0].message.content.trim();
+        if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: full.length });
+        return full;
+      }
     } else {
       // Multiple chunks - summarize each and then combine
       const chunkSummaries = [];
@@ -269,23 +299,48 @@ ${text}`;
       }
 
       for (let i = 0; i < chunks.length; i++) {
+        if (typeof onProgress === 'function') onProgress({ type: 'chunk-start', chunkIndex: i + 1, totalChunks: chunks.length });
         const chunkPrompt = `${userPrompt.split('Content:')[0]}
 This is part ${i + 1} of ${chunks.length}.
 
 Content:
 ${chunks[i]}`;
 
-        const response = await openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: chunkPrompt }
-          ],
-          temperature: 0.3,
-          max_tokens: chunkMaxTokens
-        });
+        // Attempt streaming for each chunk too (shorter feedback bursts)
+        let chunkFull = '';
+        try {
+          const stream = await openai.chat.completions.create({
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: chunkPrompt }
+            ],
+            temperature: 0.3,
+            max_tokens: chunkMaxTokens,
+            stream: true
+          });
+          for await (const part of stream) {
+            const delta = part?.choices?.[0]?.delta?.content || '';
+            if (delta) {
+              chunkFull += delta;
+              if (typeof onProgress === 'function') onProgress({ type: 'delta', deltaText: delta, totalChars: chunkFull.length, chunkIndex: i + 1, totalChunks: chunks.length });
+            }
+          }
+        } catch (e) {
+          const response = await openai.chat.completions.create({
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: chunkPrompt }
+            ],
+            temperature: 0.3,
+            max_tokens: chunkMaxTokens
+          });
+          chunkFull = response.choices[0].message.content.trim();
+        }
 
-        chunkSummaries.push(response.choices[0].message.content.trim());
+        if (typeof onProgress === 'function') onProgress({ type: 'chunk-done', chunkIndex: i + 1, totalChunks: chunks.length });
+        chunkSummaries.push(chunkFull.trim());
       }
 
       // Combine summaries if multiple chunks
@@ -304,6 +359,7 @@ ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
           finalMaxTokens = 8000; // Much higher for comprehensive final output
         }
 
+        if (typeof onProgress === 'function') onProgress({ type: 'combine-start' });
         const finalResponse = await openai.chat.completions.create({
           model: model,
           messages: [
@@ -313,11 +369,14 @@ ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
           temperature: 0.3,
           max_tokens: finalMaxTokens
         });
-
-        return finalResponse.choices[0].message.content.trim();
+        const final = finalResponse.choices[0].message.content.trim();
+        if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: final.length });
+        return final;
       }
 
-      return chunkSummaries[0];
+      const only = chunkSummaries[0];
+      if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: only.length });
+      return only;
     }
   } catch (error) {
     // Check if it's a rate limit error
