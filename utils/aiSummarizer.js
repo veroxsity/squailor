@@ -233,6 +233,14 @@ ${text}`;
     }
   }
 
+  // If images are provided, enforce an OCR-first behavior and reduce generic templating
+  const hasImages = Array.isArray(images) && images.length > 0;
+  if (hasImages) {
+    systemPrompt += `\n\nImage handling requirements (MANDATORY):\n- If images are provided, FIRST transcribe all visible text from the images VERBATIM.\n- Preserve exact wording, casing, and obvious line breaks from the image text.\n- Do NOT invent content; if unreadable, write [unreadable].\n- After listing the transcribed image text, use it alongside the document text to produce the requested output.`;
+
+    userPrompt = `Before summarizing, perform an OCR step on the attached images and output a section titled:\n"Transcribed text from images"\n- List the text exactly as it appears on each image (e.g., "Slide 1 image:")\n- Then proceed with the requested ${summaryStyle === 'notes' ? 'notes' : 'summary'} based on BOTH the document text and the transcribed image text.\n\n` + userPrompt;
+  }
+
   try {
     // Split text into chunks if it's too long (GPT has token limits)
     const maxChunkSize = 12000; // Conservative limit for GPT-4

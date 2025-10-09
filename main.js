@@ -751,6 +751,17 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
         continue;
       }
 
+      // Inform renderer about image detection (if any)
+      if (imagesForVision && imagesForVision.length) {
+        event.sender.send('processing-progress', {
+          fileName,
+          fileIndex: i + 1,
+          totalFiles,
+          status: `Found ${imagesForVision.length} image(s) for analysis`,
+          stage: 'extracted'
+        });
+      }
+
       // Send progress update
       event.sender.send('processing-progress', {
         fileName,
@@ -1034,6 +1045,20 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
 - Avoids repetition and keeps a logical flow\n\n`;
 
   const combinedText = aggregationIntro + cleanedParts;
+
+  // Notify about images collected across sources (if any)
+  if (collectedImages.length) {
+    const note = `Collected ${collectedImages.length} image(s) from sources`;
+    extracted.forEach((info, idx) => {
+      event.sender.send('processing-progress', {
+        fileName: info.fileName,
+        fileIndex: idx + 1,
+        totalFiles,
+        status: note,
+        stage: 'extracted'
+      });
+    });
+  }
 
   // Indicate combining stage for each file (moves progress forward visually)
   extracted.forEach((info, idx) => {
