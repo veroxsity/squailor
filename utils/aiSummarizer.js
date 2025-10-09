@@ -1,17 +1,19 @@
 const OpenAI = require('openai');
 
 /**
- * Summarize text using OpenRouter API
+ * Summarize text (and optionally images) using OpenRouter API
  * @param {string} text - Text to summarize
- * @param {string} summaryType - Type of summary ('normal' or 'short')
+ * @param {string} summaryType - Type of summary ('normal' or 'short' or 'longer')
  * @param {string} apiKey - OpenRouter API key
  * @param {string} responseTone - Tone of response ('casual', 'formal', 'informative', 'easy')
  * @param {string} model - Model to use (defaults to gpt-4o-mini via OpenRouter)
  * @param {string} summaryStyle - Style of summary ('teaching' or 'notes')
+ * @param {function|null} onProgress - optional callback for streaming progress
+ * @param {Array<{dataUrl:string, altText?:string}>} [images] - Optional images for vision-capable models
  * @returns {Promise<string>} - Summary text
  */
 // onProgress: optional callback({ type: 'delta'|'chunk-start'|'chunk-done'|'combine-start'|'done', deltaText?, totalChars? , chunkIndex?, totalChunks? })
-async function summarizeText(text, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', onProgress = null) {
+async function summarizeText(text, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', onProgress = null, images = []) {
   // Configure OpenAI SDK to use OpenRouter
   const openai = new OpenAI({
     apiKey: apiKey,
@@ -249,11 +251,13 @@ ${text}`;
       // Try streaming for live feedback; fallback to non-streaming if not supported
       let full = '';
       try {
+        // If images are provided, prefer a vision-capable model prompt format (multi-part content)
+        const userMessage = buildUserMessage(userPrompt, images);
         const stream = await openai.chat.completions.create({
           model: model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
+            userMessage
           ],
           temperature: 0.3,
           max_tokens: maxTokens,
@@ -273,11 +277,12 @@ ${text}`;
         return full.trim();
       } catch (e) {
         // Fallback to non-streaming
+        const userMessage = buildUserMessage(userPrompt, images);
         const response = await openai.chat.completions.create({
           model: model,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
+            userMessage
           ],
           temperature: 0.3,
           max_tokens: maxTokens
@@ -310,15 +315,15 @@ ${chunks[i]}`;
         let chunkFull = '';
         try {
           const stream = await openai.chat.completions.create({
-            model: model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: chunkPrompt }
-            ],
-            temperature: 0.3,
-            max_tokens: chunkMaxTokens,
-            stream: true
-          });
+              model: model,
+              messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: chunkPrompt }
+              ],
+              temperature: 0.3,
+              max_tokens: chunkMaxTokens,
+              stream: true
+            });
           for await (const part of stream) {
             const delta = part?.choices?.[0]?.delta?.content || '';
             if (delta) {
@@ -458,3 +463,43 @@ function splitTextIntoChunks(text, maxSize) {
 module.exports = {
   summarizeText
 };
+
+/**
+ * Build a user message supporting optional image content for vision models
+ * Falls back to plain text content when no images are provided.
+ * The OpenRouter Chat Completions API accepts content as string or array of parts
+ * compatible with OpenAI’s vision content format.
+ */
+function buildUserMessage(userPrompt, images) {
+  if (!images || images.length === 0) {
+    return { role: 'user', content: userPrompt };
+  }
+  // Build multi-part content with a text instruction and up to a few images
+  const parts = [
+    { type: 'text', text: `${userPrompt}\n\nAlso consider the following slide images (if any text seems missing from the slides, infer from visuals):` }
+  ];
+  for (const img of images) {
+    parts.push({ type: 'text', text: img.altText ? `Slide ${img.slideNumber}: ${img.altText}` : `Slide ${img.slideNumber}` });
+    parts.push({ type: 'image_url', image_url: { url: img.dataUrl } });
+  }
+  return { role: 'user', content: parts };
+}
+
+/**
+ * Heuristic check for whether a model likely supports images (vision)
+ * This is best-effort; OpenRouter model naming commonly includes '4o'/'omni'/'vision'
+ * You can expand/override this list via settings later.
+ */
+function modelSupportsVision(model) {
+  if (!model || typeof model !== 'string') return false;
+  const m = model.toLowerCase();
+  return (
+    m.includes('gpt-4o') ||
+    m.includes('omni') ||
+    m.includes('vision') ||
+    m.includes('claude-3.5-sonnet') || // Anthropic vision-capable on OpenRouter
+    m.includes('llava')
+  );
+}
+
+module.exports.modelSupportsVision = modelSupportsVision;
