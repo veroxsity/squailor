@@ -529,6 +529,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
             'setup': { emoji: '📁', color: '#667eea' },
             'storing': { emoji: '💾', color: '#667eea' },
             'extracting': { emoji: '📖', color: '#667eea' },
+            'extracted': { emoji: '✅', color: '#10b981' },
+            'combining': { emoji: '🧩', color: '#8b5cf6' },
             'summarizing': { emoji: '🤖', color: '#8b5cf6' },
             'saving': { emoji: '✅', color: '#10b981' },
             'complete': { emoji: '✓', color: '#10b981' },
@@ -593,6 +595,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
                   'setup': '30%',
                   'storing': '40%',
                   'extracting': '60%',
+                  'extracted': '60%',
+                  'combining': '70%',
                   'summarizing': '85%',
                   'saving': '95%'
                 };

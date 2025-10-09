@@ -884,6 +884,16 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
       }
 
       extracted.push({ fileName, ext, text });
+
+      // Notify renderer that extraction for this file finished
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Text extracted',
+        stage: 'extracted',
+        charCount: text.length
+      });
     } catch (err) {
       event.sender.send('processing-progress', {
         fileName,
@@ -914,13 +924,26 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
 
   const combinedText = aggregationIntro + cleanedParts;
 
-  event.sender.send('processing-progress', {
-    fileName: `${totalFiles} files`,
-    fileIndex: 1,
-    totalFiles: 1,
-    status: 'Generating combined AI summary...',
-    stage: 'summarizing',
-    charCount: combinedText.length
+  // Indicate combining stage for each file (moves progress forward visually)
+  extracted.forEach((info, idx) => {
+    event.sender.send('processing-progress', {
+      fileName: info.fileName,
+      fileIndex: idx + 1,
+      totalFiles,
+      status: 'Combining sources...',
+      stage: 'combining'
+    });
+  });
+
+  // Move each file to summarizing stage for better UI feedback
+  extracted.forEach((info, idx) => {
+    event.sender.send('processing-progress', {
+      fileName: info.fileName,
+      fileIndex: idx + 1,
+      totalFiles,
+      status: 'Generating combined AI summary...',
+      stage: 'summarizing'
+    });
   });
 
   let combinedSummary;
