@@ -11,6 +11,8 @@ const saveApiKeyBtn = document.getElementById('saveApiKey');
 const apiKeyStatus = document.getElementById('apiKeyStatus');
 const selectFilesBtn = document.getElementById('selectFiles');
 const processFilesBtn = document.getElementById('processFiles');
+let processCombined = false; // user choice: combined vs individual
+const combinedToggle = document.getElementById('combinedToggle');
 const fileListDiv = document.getElementById('fileList');
 const resultsSection = document.getElementById('resultsSection');
 const resultsDiv = document.getElementById('results');
@@ -57,6 +59,19 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Set model
   if (modelSelect) {
     modelSelect.value = selectedModel;
+  }
+
+  // Combined toggle
+  if (combinedToggle) {
+    combinedToggle.checked = processCombined;
+    combinedToggle.addEventListener('change', () => {
+      processCombined = combinedToggle.checked;
+      // Update primary button label
+      if (processFilesBtn) {
+        processFilesBtn.querySelector('span:last-child').textContent = processCombined ? 'Generate Combined Summary' : 'Generate Summaries';
+      }
+      renderFileList();
+    });
   }
 });
 
@@ -408,7 +423,13 @@ function renderFileList() {
     return;
   }
 
-  fileListDiv.innerHTML = selectedFiles.map((filePath, index) => {
+  // Cap at 3 files if combined mode is on
+  const filesToShow = processCombined ? selectedFiles.slice(0, 3) : selectedFiles;
+  if (processCombined && selectedFiles.length > 3) {
+    showToast('Combined mode supports up to 3 files. Extra files are ignored.', 'info');
+  }
+
+  fileListDiv.innerHTML = filesToShow.map((filePath, index) => {
     const fileName = filePath.split(/[/\\]/).pop();
     const ext = fileName.split('.').pop().toUpperCase();
     const icon = ext === 'PDF' ? '📕' : '📊';
@@ -585,16 +606,42 @@ if (processFilesBtn && resultsDiv && resultsSection) {
     });
 
     try {
-      const results = await window.electronAPI.processDocuments(
-        selectedFiles,
-        summaryType,
-        apiKey,
-        responseTone,
-        selectedModel,  // Pass the selected model
-        summaryStyle    // Pass the selected style
-      );
+      if (processCombined) {
+        const combined = await window.electronAPI.processDocumentsCombined(
+          selectedFiles.slice(0, 3),
+          summaryType,
+          apiKey,
+          responseTone,
+          selectedModel,
+          summaryStyle
+        );
 
-      await displayResults(results);
+        if (!combined || !combined.success) {
+          throw new Error((combined && combined.error) || 'Combined summary failed');
+        }
+        // Normalize to results array for modal
+        const reduction = Math.round((1 - combined.summary.length / combined.originalLength) * 100);
+        await displayResults([
+          {
+            success: true,
+            fileName: combined.fileName,
+            folderId: combined.folderId,
+            fileType: '.aggregate',
+            originalLength: combined.originalLength,
+            summary: combined.summary
+          }
+        ]);
+      } else {
+        const results = await window.electronAPI.processDocuments(
+          selectedFiles,
+          summaryType,
+          apiKey,
+          responseTone,
+          selectedModel,  // Pass the selected model
+          summaryStyle    // Pass the selected style
+        );
+        await displayResults(results);
+      }
 
       // Clear the uploaded files after successful processing
       selectedFiles = [];
@@ -1234,6 +1281,21 @@ async function loadDocumentViewer(index, item) {
     await loadPDFViewer(viewerDiv, item.folderId);
   } else if (item.fileType === '.pptx' || item.fileType === '.ppt') {
     await loadPPTViewer(viewerDiv, item);
+  } else if (item.fileType === '.aggregate') {
+    viewerDiv.innerHTML = `
+      <div class="ppt-viewer">
+        <div class="ppt-info">
+          <span class="ppt-icon">🧩</span>
+          <div>
+            <div class="ppt-title">${escapeHtml(item.fileName)}</div>
+            <div class="ppt-subtitle">Combined summary from multiple sources</div>
+          </div>
+        </div>
+        <div class="ppt-content">
+          ${escapeHtml(item.preview || 'Combined across multiple documents.')}
+        </div>
+      </div>
+    `;
   }
 }
 

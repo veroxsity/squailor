@@ -825,6 +825,180 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
   return results;
 });
 
+// New: Process multiple documents into one combined/aggregate summary (max 3)
+ipcMain.handle('process-documents-combined', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching') => {
+  // Enforce maximum of 3 files to control token/cost
+  const inputFiles = Array.isArray(filePaths) ? filePaths.slice(0, 3) : [];
+  const totalFiles = inputFiles.length;
+  if (totalFiles === 0) {
+    return { success: false, error: 'No files provided' };
+  }
+
+  // Lazy-load heavy modules
+  if (!pdfParse) {
+    pdfParse = require('pdf-parse-fork');
+  }
+  if (!parsePresentation) {
+    parsePresentation = require('./utils/pptxParser').parsePresentation;
+  }
+  if (!summarizeText) {
+    summarizeText = require('./utils/aiSummarizer').summarizeText;
+  }
+  if (!calculateFileHash) {
+    calculateFileHash = require('./utils/fileHash').calculateFileHash;
+  }
+
+  // Extract text from each file with progress events
+  const extracted = [];
+  for (let i = 0; i < inputFiles.length; i++) {
+    const filePath = inputFiles[i];
+    const fileName = path.basename(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    try {
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: 'Reading and extracting text...',
+        stage: 'extracting'
+      });
+
+      let text = '';
+      if (ext === '.pdf') {
+        const dataBuffer = await fs.readFile(filePath);
+        const pdfData = await pdfParse(dataBuffer);
+        text = pdfData.text || '';
+      } else if (ext === '.pptx' || ext === '.ppt') {
+        text = await parsePresentation(filePath);
+      } else if (ext === '.docx' || ext === '.doc') {
+        if (!parseDocx) {
+          parseDocx = require('./utils/docxParser').parseDocx;
+        }
+        text = await parseDocx(filePath);
+      } else {
+        text = '';
+      }
+
+      if (!text || !text.trim()) {
+        throw new Error('No text content found in document');
+      }
+
+      extracted.push({ fileName, ext, text });
+    } catch (err) {
+      event.sender.send('processing-progress', {
+        fileName,
+        fileIndex: i + 1,
+        totalFiles,
+        status: err.message || 'Failed to extract',
+        stage: 'error'
+      });
+      return { success: false, error: `Failed to extract ${fileName}: ${err.message}` };
+    }
+  }
+
+  // Build combined prompt text with caps per-file to avoid token blowups
+  const MAX_PER_FILE_CHARS = 20000; // cap each source
+  const cleanedParts = extracted.map((item, idx) => {
+    let t = item.text.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+    if (t.length > MAX_PER_FILE_CHARS) {
+      t = t.slice(0, MAX_PER_FILE_CHARS) + `\n...[truncated ${t.length - MAX_PER_FILE_CHARS} chars]`;
+    }
+    return `--- Source ${idx + 1}: ${item.fileName} (${item.ext}) ---\n${t}\n`;
+  }).join('\n');
+
+  const aggregationIntro = `You are given ${totalFiles} documents. Produce a single cohesive summary that:
+- Identifies themes that span multiple documents
+- Resolves or notes contradictions
+- Clearly attributes unique points to their sources when important (Source 1/2/3)
+- Avoids repetition and keeps a logical flow\n\n`;
+
+  const combinedText = aggregationIntro + cleanedParts;
+
+  event.sender.send('processing-progress', {
+    fileName: `${totalFiles} files`,
+    fileIndex: 1,
+    totalFiles: 1,
+    status: 'Generating combined AI summary...',
+    stage: 'summarizing',
+    charCount: combinedText.length
+  });
+
+  let combinedSummary;
+  try {
+    combinedSummary = await summarizeText(combinedText, summaryType, apiKey, responseTone, model, summaryStyle);
+  } catch (error) {
+    let displayMessage = error.message || 'AI summarization failed';
+    event.sender.send('processing-progress', {
+      fileName: `${totalFiles} files`,
+      fileIndex: 1,
+      totalFiles: 1,
+      status: displayMessage,
+      stage: 'error'
+    });
+    return { success: false, error: displayMessage };
+  }
+
+  // Create a synthetic folder to store the combined entry (no single original file)
+  const folderId = generateShortUUID();
+  const folderPath = path.join(documentsStoragePath, folderId);
+  await fs.mkdir(folderPath, { recursive: true });
+
+  // Create a descriptive filename for display purposes only
+  const displayName = totalFiles === 1
+    ? extracted[0].fileName
+    : `Combined: ${extracted[0].fileName} + ${totalFiles - 1} more`;
+
+  // Compute a synthetic hash based on all inputs
+  const hashes = [];
+  for (const f of inputFiles) {
+    try { hashes.push(await calculateFileHash(f)); } catch (e) { /* ignore */ }
+  }
+  const syntheticHash = require('crypto').createHash('sha256').update(hashes.join('|')).digest('hex');
+
+  // Build preview text from first source (or from combined parts)
+  let previewText = extracted[0].text.slice(0, 500);
+  if (extracted[0].ext === '.pptx' || extracted[0].ext === '.ppt') {
+    const m = extracted[0].text.match(/--- Slide \d+ ---\n([\s\S]*?)(?=\n--- Slide \d+ ---|$)/);
+    if (m && m[1]) previewText = m[1].slice(0, 500);
+  }
+
+  const originalLength = cleanedParts.length;
+  const summaryData = {
+    fileName: displayName,
+    fileType: '.aggregate',
+    fileHash: syntheticHash,
+    summary: combinedSummary,
+    originalLength: originalLength,
+    summaryLength: combinedSummary.length,
+    summaryType,
+    responseTone,
+    summaryStyle,
+    timestamp: new Date().toISOString(),
+    model,
+    preview: previewText.trim() + (originalLength > 500 ? '...' : ''),
+    sources: extracted.map(e => ({ fileName: e.fileName, fileType: e.ext }))
+  };
+
+  await saveSummaryToFolder(folderId, summaryData);
+
+  event.sender.send('processing-progress', {
+    fileName: displayName,
+    fileIndex: 1,
+    totalFiles: 1,
+    status: 'Complete! ✓',
+    stage: 'complete'
+  });
+
+  return {
+    success: true,
+    folderId,
+    fileName: displayName,
+    fileType: '.aggregate',
+    originalLength,
+    summary: combinedSummary
+  };
+});
+
 // Save summary to file
 ipcMain.handle('save-summary', async (event, fileName, summary) => {
   const result = await dialog.showSaveDialog(mainWindow, {
