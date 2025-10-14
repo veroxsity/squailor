@@ -64,6 +64,8 @@ body.dark-theme {
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+  /* Tell Chromium to prefer dark UI for built-ins like scrollbars */
+  color-scheme: dark;
 }
 
 body {
@@ -74,6 +76,61 @@ body {
   overflow-x: hidden;
   position: relative;
   transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Global Scrollbar (Chromium/Electron) */
+/* Placed early so more specific component scrollbars later in the file can override as needed */
+:root { --scrollbar-size: 10px; }
+
+/* Ensure the root (main app) scrollbar is themed */
+html.dark-theme {
+  color-scheme: dark;
+}
+
+html.light-theme {
+  color-scheme: light;
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--primary), var(--secondary));
+  border-radius: 8px;
+  border: 2px solid var(--bg-secondary);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, var(--primary-dark), var(--secondary));
+}
+
+/* Firefox fallback (has no effect in Electron, harmless to keep) */
+html, body {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) var(--bg-secondary);
+}
+
+/* Fine-tune additional scrollbar parts */
+*::-webkit-scrollbar-corner {
+  background: var(--bg-secondary);
+}
+
+*::-webkit-scrollbar-button {
+  background: transparent;
+  height: 0;
+  width: 0;
+}
+
+/* Ensure light theme gets appropriate native widgets */
+body.light-theme {
+  color-scheme: light;
 }
 
 /* Background Animation */
@@ -303,6 +360,123 @@ body {
   border: 1px solid var(--card-border);
   overflow: hidden;
   transition: all 0.3s ease;
+}
+
+/* Settings Layout (Discord-like) */
+#settingsPage .settings-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+}
+
+#settingsPage .settings-sidebar {
+  position: sticky;
+  top: 88px; /* below navbar */
+  align-self: start;
+  /* Let it occupy the viewport height minus navbar/header, but don't force a fixed height */
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  padding: 16px;
+}
+
+/* Use full container width for the Settings page to keep the sidebar pinned at the screen side */
+#settingsPage .main-content {
+  max-width: 1200px;
+}
+
+#settingsPage .settings-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 16px 10px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+
+#settingsPage .avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary), var(--secondary));
+  color: #fff;
+  font-weight: 800;
+}
+
+#settingsPage .profile-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+#settingsPage .settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+#settingsPage .settings-nav-group {
+  color: var(--text-light);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 10px 8px 6px 8px;
+}
+
+#settingsPage .settings-nav-item {
+  text-align: left;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+#settingsPage .settings-nav-item:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+#settingsPage .settings-nav-item.active {
+  background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+  color: #fff;
+}
+
+#settingsPage .settings-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+#settingsPage .settings-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: -8px; /* compensate for removed page header */
+}
+
+#settingsPage .settings-panel {
+  display: none;
+}
+
+#settingsPage .settings-panel.active {
+  display: block;
 }
 
 .card:hover {
@@ -1499,6 +1673,15 @@ body {
   .nav-menu {
     width: 100%;
     justify-content: center;
+  }
+
+  #settingsPage .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  #settingsPage .settings-sidebar {
+    position: static;
+    height: auto;
   }
 }
 

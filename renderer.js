@@ -36,6 +36,9 @@ const statsTotalSize = document.getElementById('statsTotalSize');
 const maxImagesInput = document.getElementById('maxImagesInput');
 const saveMaxImagesBtn = document.getElementById('saveMaxImages');
 const maxImagesStatus = document.getElementById('maxImagesStatus');
+// Home page: process images toggle
+const processImagesToggle = document.getElementById('processImagesToggle');
+let processImages = true;
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -59,6 +62,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load image settings
   if (settings.maxImageCount !== undefined && maxImagesInput) {
     maxImagesInput.value = settings.maxImageCount;
+  }
+  // Load processImages preference
+  if (typeof settings.processImages === 'boolean') {
+    processImages = settings.processImages;
+  }
+  if (processImagesToggle) {
+    processImagesToggle.checked = processImages;
+    processImagesToggle.addEventListener('change', async () => {
+      processImages = processImagesToggle.checked;
+      try { await window.electronAPI.saveSettings({ processImages }); } catch (_) {}
+    });
   }
   
   // Apply theme
@@ -176,9 +190,51 @@ navItems.forEach(item => {
   });
 });
 
+// Settings sidebar navigation
+document.addEventListener('DOMContentLoaded', () => {
+  const sidebarButtons = document.querySelectorAll('.settings-nav-item');
+  const panels = document.querySelectorAll('.settings-panel');
+  const titleEl = document.getElementById('settingsSectionTitle');
+  const headerAction = document.getElementById('settingsHeaderAction');
+
+  function setActive(panelId, label) {
+    panels.forEach(p => p.classList.remove('active'));
+    const active = document.getElementById(`panel-${panelId}`);
+    if (active) active.classList.add('active');
+    sidebarButtons.forEach(b => b.classList.remove('active'));
+    const btn = Array.from(sidebarButtons).find(b => b.dataset.panel === panelId);
+    if (btn) btn.classList.add('active');
+    if (titleEl) titleEl.textContent = label || btn?.textContent?.replace(/^[^A-Za-z0-9]+\s*/, '') || 'Settings';
+
+    // Optional header action example for General/Profile
+    if (panelId === 'general') {
+      if (headerAction) {
+        headerAction.textContent = 'Save';
+        headerAction.style.display = 'inline-flex';
+        headerAction.onclick = () => document.getElementById('saveApiKey')?.click();
+      }
+    } else {
+      if (headerAction) headerAction.style.display = 'none';
+    }
+  }
+
+  sidebarButtons.forEach(btn => {
+    btn.addEventListener('click', () => setActive(btn.dataset.panel));
+  });
+
+  // Ensure default active
+  if (document.getElementById('panel-general')) setActive('general');
+});
+
 // Theme Management
 function applyTheme(theme) {
   document.body.className = `${theme}-theme`;
+  // Also reflect theme on the <html> element so root scrollbars pick it up
+  const root = document.documentElement;
+  if (root) {
+    root.classList.remove('dark-theme', 'light-theme');
+    root.classList.add(`${theme}-theme`);
+  }
   currentTheme = theme;
   localStorage.setItem('app_theme', theme);
   
@@ -686,7 +742,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
           apiKey,
           responseTone,
           selectedModel,
-          summaryStyle
+          summaryStyle,
+          processImages
         );
 
         if (!combined || !combined.success) {
@@ -711,7 +768,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
           apiKey,
           responseTone,
           selectedModel,  // Pass the selected model
-          summaryStyle    // Pass the selected style
+          summaryStyle,   // Pass the selected style
+          processImages
         );
         await displayResults(results);
       }

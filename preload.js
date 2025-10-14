@@ -2,10 +2,10 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFile: () => ipcRenderer.invoke('select-file'),
-  processDocuments: (filePaths, summaryType, apiKey, responseTone, model, summaryStyle) => 
-    ipcRenderer.invoke('process-documents', filePaths, summaryType, apiKey, responseTone, model, summaryStyle),
-  processDocumentsCombined: (filePaths, summaryType, apiKey, responseTone, model, summaryStyle) => 
-    ipcRenderer.invoke('process-documents-combined', filePaths, summaryType, apiKey, responseTone, model, summaryStyle),
+  processDocuments: (filePaths, summaryType, apiKey, responseTone, model, summaryStyle, processImages) => 
+    ipcRenderer.invoke('process-documents', filePaths, summaryType, apiKey, responseTone, model, summaryStyle, processImages),
+  processDocumentsCombined: (filePaths, summaryType, apiKey, responseTone, model, summaryStyle, processImages) => 
+    ipcRenderer.invoke('process-documents-combined', filePaths, summaryType, apiKey, responseTone, model, summaryStyle, processImages),
   saveSummary: (fileName, summary) => 
     ipcRenderer.invoke('save-summary', fileName, summary),
   validateApiKey: (apiKey) => 

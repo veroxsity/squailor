@@ -45,7 +45,7 @@ async function summarizeText(text, summaryType, apiKey, responseTone = 'casual',
   };
 
   const selectedTone = toneInstructions[responseTone] || toneInstructions.casual;
-  
+
   // Style-specific adjustments - adapt based on length
   const styleInstructions = {
     teaching: {
@@ -61,8 +61,26 @@ async function summarizeText(text, summaryType, apiKey, responseTone = 'casual',
         : 'Write as if a student is taking notes during class. Use bullet points, short phrases, abbreviations where natural, key terms highlighted, and organized sections. Be concise but capture all important information. Use arrows (→), dashes (-), and indentation for hierarchy.'
     }
   };
-  
+
   const selectedStyle = styleInstructions[summaryStyle] || styleInstructions.teaching;
+
+  // Estimate length targets to reduce over-compression, especially in 'longer' mode
+  const approxWords = Math.max(1, Math.floor(text.length / 5));
+  let minWordsTarget = 0;
+  let maxWordsTarget = 0;
+  if (summaryType === 'short') {
+    // Aggressive compression
+    minWordsTarget = Math.min(600, Math.floor(approxWords * 0.08));
+    maxWordsTarget = Math.max(minWordsTarget + 150, Math.floor(approxWords * 0.15));
+  } else if (summaryType === 'normal') {
+    // Moderate compression
+    minWordsTarget = Math.min(3000, Math.floor(approxWords * 0.25));
+    maxWordsTarget = Math.max(minWordsTarget + 400, Math.floor(approxWords * 0.45));
+  } else {
+    // 'longer' — minimal compression; allow near-original length when needed
+    minWordsTarget = Math.min(12000, Math.floor(approxWords * 0.55));
+    maxWordsTarget = Math.min(18000, Math.max(minWordsTarget + 1000, Math.floor(approxWords * 0.9)));
+  }
 
   // Prepare prompt based on summary type and style
   let systemPrompt = '';
@@ -114,7 +132,7 @@ Your task is to write extensive notes as if a dedicated student is capturing eve
 ${selectedTone.instructions}
 ${selectedStyle.instructions}
 Your notes should be THOROUGH and COMPREHENSIVE. Do not just list bullet points - expand on each concept with full explanations, examples, and context.
-Aim to capture at least 70-80% of the original content's depth and detail.`;
+Minimize compression and preserve as much detail as practical.`;
 
       userPrompt = `Please create COMPREHENSIVE, IN-DEPTH NOTES from the following content.
 Write as if you're a diligent student taking detailed notes during an important lecture where you want to capture EVERYTHING.
@@ -126,7 +144,7 @@ IMPORTANT INSTRUCTIONS:
 - Aim for comprehensive coverage - your notes should allow someone to learn the topic deeply
 - Use nested bullet points with DETAILED explanations at each level
 - Don't skip over ideas - elaborate and explain fully
-- Target: Retain 70-80% of the original content's information density
+- LENGTH TARGET: At minimum, write ${minWordsTarget.toLocaleString()} words and up to about ${maxWordsTarget.toLocaleString()} words if needed to preserve detail.
 
 Format with clear hierarchy but EXPAND each point:
 # Main Topic 1
@@ -155,7 +173,7 @@ ${selectedTone.instructions}
 ${selectedStyle.instructions}
 Write in detailed paragraphs with complete explanations. Do NOT just list bullet points or short summaries.
 Think of this as writing a textbook chapter or detailed study guide. Be thorough and comprehensive.
-Aim to preserve 70-80% of the original content's depth while making it clearer and better organized.`;
+Minimize compression. Retain as much detail as practical while organizing and clarifying the material.`;
 
       userPrompt = `Please create an EXTENSIVE, IN-DEPTH EXPLANATION of the following content.
 
@@ -166,7 +184,7 @@ IMPORTANT INSTRUCTIONS:
 - Be comprehensive - don't skip over ideas, elaborate on everything important
 - Use clear headings and sections, but write detailed explanatory paragraphs under each
 - Aim for depth and thoroughness - someone should be able to learn this topic deeply from your explanation
-- Target: Retain 70-80% of the original content's information density
+- LENGTH TARGET: At minimum, write ${minWordsTarget.toLocaleString()} words and up to about ${maxWordsTarget.toLocaleString()} words if needed to preserve detail. Do NOT aggressively shorten the content.
 
 Structure your response with:
 - Clear headings and subheadings for organization
@@ -222,28 +240,29 @@ ${selectedTone.instructions}
 ${selectedStyle.instructions}
 Your summaries should be clear, well-organized, and maintain important details while being more concise than the original.`;
 
-      userPrompt = `Please create a DETAILED summary of the following content.
+  userPrompt = `Please create a DETAILED summary of the following content.
 Organize the information logically with clear sections and headings where appropriate.
 Maintain important details, examples, and explanations that help with learning.
 Use a ${selectedTone.style} writing style in ${selectedStyle.format} format.
 Make the content easier to study and understand.
+${summaryType === 'longer' ? `\nLENGTH TARGET: At minimum, write ${minWordsTarget.toLocaleString()} words and up to about ${maxWordsTarget.toLocaleString()} words if needed. Avoid aggressive compression; preserve nuance and detail.` : ''}
 
 Content:
 ${text}`;
     }
   }
 
-  // If images are provided, enforce an OCR-first behavior and reduce generic templating
+  // If images are provided, give guidance to use them as optional context (no forced OCR transcript)
   const hasImages = Array.isArray(images) && images.length > 0;
   if (hasImages) {
-    systemPrompt += `\n\nImage handling requirements (MANDATORY):\n- If images are provided, FIRST transcribe all visible text from the images VERBATIM.\n- Preserve exact wording, casing, and obvious line breaks from the image text.\n- Do NOT invent content; if unreadable, write [unreadable].\n- After listing the transcribed image text, use it alongside the document text to produce the requested output.`;
+    systemPrompt += `\n\nImage usage guidance:\n- PRIORITIZE the provided document text for summarization.\n- Treat images as supplementary context only.\n- Do NOT output a separate OCR transcript or verbatim dump of image text.\n- If images contain key labels, headings, or brief captions that materially improve understanding, integrate those succinctly into the summary/notes.\n- Do not over-index on images; they should aid, not dominate, the output.`;
 
-    userPrompt = `Before summarizing, perform an OCR step on the attached images and output a section titled:\n"Transcribed text from images"\n- List the text exactly as it appears on each image (e.g., "Slide 1 image:")\n- Then proceed with the requested ${summaryStyle === 'notes' ? 'notes' : 'summary'} based on BOTH the document text and the transcribed image text.\n\n` + userPrompt;
+    userPrompt = `Use the attached images only to clarify or enrich the output when they add value.\nDo not transcribe images verbatim or create a separate transcription section.\nFocus on summarizing the provided document text; incorporate only essential details from images when relevant.\n\n` + userPrompt;
   }
 
   try {
-    // Split text into chunks if it's too long (GPT has token limits)
-    const maxChunkSize = 12000; // Conservative limit for GPT-4
+  // Split text into chunks if it's too long (GPT has token limits)
+  const maxChunkSize = summaryType === 'longer' ? 24000 : 12000; // Larger chunks for longer mode
     const chunks = splitTextIntoChunks(text, maxChunkSize);
 
     if (chunks.length === 1) {
@@ -253,7 +272,7 @@ ${text}`;
       if (summaryType === 'short') {
         maxTokens = 1000;
       } else if (summaryType === 'longer') {
-        maxTokens = 8000; // Much higher for longer, comprehensive summaries
+        maxTokens = 9000; // Higher for longer, comprehensive summaries
       }
       
       // Try streaming for live feedback; fallback to non-streaming if not supported
@@ -308,7 +327,7 @@ ${text}`;
       if (summaryType === 'short') {
         chunkMaxTokens = 500;
       } else if (summaryType === 'longer') {
-        chunkMaxTokens = 4000; // Much higher for comprehensive chunks
+        chunkMaxTokens = 5000; // Higher for comprehensive chunks
       }
 
       for (let i = 0; i < chunks.length; i++) {
@@ -358,9 +377,12 @@ ${chunks[i]}`;
 
       // Combine summaries if multiple chunks
       if (chunkSummaries.length > 1) {
-        const combinedPrompt = `Please combine and consolidate these summaries into a single, 
-coherent ${summaryType === 'longer' ? 'comprehensive and detailed' : ''} summary. 
-${summaryType === 'longer' ? 'Maintain ALL details and explanations. Write thorough paragraphs, not just bullet points.' : 'Remove any redundancy while maintaining all key information.'}
+        const combinedPrompt = `Please merge these per-part outputs into a single, coherent document.
+${summaryType === 'longer' 
+  ? 'CRITICAL: Do NOT shorten or aggressively condense. Preserve details and explanations. Stitch the parts together with consistent structure and headings. Deduplicate only trivial exact repeats.'
+  : 'Remove obvious redundancy while keeping all key information and flow.'}
+
+Keep the style consistent with the earlier instructions.${summaryType === 'longer' ? ` Aim for at least ${minWordsTarget.toLocaleString()} words overall if the content warrants it.` : ''}
 
 ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
 
@@ -369,7 +391,7 @@ ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
         if (summaryType === 'short') {
           finalMaxTokens = 1000;
         } else if (summaryType === 'longer') {
-          finalMaxTokens = 8000; // Much higher for comprehensive final output
+          finalMaxTokens = 9000; // Higher for comprehensive final output
         }
 
         if (typeof onProgress === 'function') onProgress({ type: 'combine-start' });
@@ -484,7 +506,7 @@ function buildUserMessage(userPrompt, images) {
   }
   // Build multi-part content with a text instruction and up to a few images
   const parts = [
-    { type: 'text', text: `${userPrompt}\n\nAlso consider the following slide images (if any text seems missing from the slides, infer from visuals):` }
+    { type: 'text', text: `${userPrompt}\n\nConsider the following images as OPTIONAL supporting context.\nDo not transcribe them; extract only brief, high-signal labels/captions if they aid the summary:` }
   ];
   for (const img of images) {
     parts.push({ type: 'text', text: img.altText ? `Slide ${img.slideNumber}: ${img.altText}` : `Slide ${img.slideNumber}` });

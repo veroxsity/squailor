@@ -5,16 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Squailor - AI Document Summarizer</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="node_modules/marked/lib/marked.umd.js"></script>
 </head>
-<body class="dark-theme">
-  <!-- Background Animation -->
-  <div class="background-animation">
+<body>
+  <!-- Animated background shapes -->
+  <div class="background-animation" aria-hidden="true">
     <div class="shape shape-1"></div>
     <div class="shape shape-2"></div>
     <div class="shape shape-3"></div>
   </div>
-
   <div class="container">
     <!-- Navigation Bar -->
     <nav class="navbar">
@@ -36,7 +34,7 @@
           <span>AI Summarizer</span>
         </div>
       </div>
-      
+
       <div class="nav-menu">
         <button class="nav-item active" data-page="home">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
@@ -51,8 +49,8 @@
           <span>History</span>
         </button>
         <button class="nav-item" data-page="settings">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path fill-rule="evenodd" d="M9.954 2.21a9.99 9.99 0 0 1 4.091-.002A3.993 3.993 0 0 0 16 5.07a3.993 3.993 0 0 0 3.457.261A9.99 9.99 0 0 1 21.5 8.876 3.993 3.993 0 0 0 20 12c0 1.264.586 2.391 1.502 3.124a10.043 10.043 0 0 1-2.046 3.543 3.993 3.993 0 0 0-3.456.261 3.993 3.993 0 0 0-1.954 2.86 9.99 9.99 0 0 1-4.091.004A3.993 3.993 0 0 0 8 18.927a3.993 3.993 0 0 0-3.457-.26A9.99 9.99 0 0 1 2.5 15.121 3.993 3.993 0 0 0 4 11.999a3.993 3.993 0 0 0-1.502-3.124 10.043 10.043 0 0 1 2.046-3.543A3.993 3.993 0 0 0 8 5.071a3.993 3.993 0 0 0 1.954-2.86zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" clip-rule="evenodd"/>
           </svg>
           <span>Settings</span>
         </button>
@@ -69,7 +67,7 @@
         </header>
 
         <div class="main-content">
-          <!-- Summary Mode Selector -->
+          <!-- Summary Length Selector -->
           <div class="card mode-card">
             <div class="card-header">
               <div class="card-icon">⚡</div>
@@ -78,7 +76,6 @@
                 <p class="card-subtitle">Choose how detailed you want the summary</p>
               </div>
             </div>
-            
             <div class="card-body">
               <div class="length-grid">
                 <div class="length-item">
@@ -91,7 +88,6 @@
                     </div>
                   </label>
                 </div>
-                
                 <div class="length-item">
                   <input type="radio" name="summaryType" value="normal" id="modeNormal" checked>
                   <label for="modeNormal" class="length-option">
@@ -102,7 +98,6 @@
                     </div>
                   </label>
                 </div>
-                
                 <div class="length-item">
                   <input type="radio" name="summaryType" value="longer" id="modeLonger">
                   <label for="modeLonger" class="length-option">
@@ -126,7 +121,6 @@
                 <p class="card-subtitle">Choose the writing style of your summary</p>
               </div>
             </div>
-            
             <div class="card-body">
               <div class="tone-grid">
                 <div class="tone-item">
@@ -139,7 +133,6 @@
                     </div>
                   </label>
                 </div>
-                
                 <div class="tone-item">
                   <input type="radio" name="responseTone" value="formal" id="toneFormal">
                   <label for="toneFormal" class="tone-option">
@@ -150,7 +143,6 @@
                     </div>
                   </label>
                 </div>
-                
                 <div class="tone-item">
                   <input type="radio" name="responseTone" value="informative" id="toneInformative">
                   <label for="toneInformative" class="tone-option">
@@ -161,7 +153,6 @@
                     </div>
                   </label>
                 </div>
-                
                 <div class="tone-item">
                   <input type="radio" name="responseTone" value="easy" id="toneEasy">
                   <label for="toneEasy" class="tone-option">
@@ -185,7 +176,6 @@
                 <p class="card-subtitle">Choose how the summary is formatted</p>
               </div>
             </div>
-            
             <div class="card-body">
               <div class="style-grid">
                 <div class="style-item">
@@ -198,7 +188,6 @@
                     </div>
                   </label>
                 </div>
-                
                 <div class="style-item">
                   <input type="radio" name="summaryStyle" value="notes" id="styleNotes">
                   <label for="styleNotes" class="style-option">
@@ -222,7 +211,6 @@
                 <p class="card-subtitle">Select PDF or PowerPoint files to summarize</p>
               </div>
             </div>
-            
             <div class="card-body">
               <div class="upload-area" id="uploadArea">
                 <div class="upload-icon">
@@ -244,21 +232,22 @@
                   <span>Choose Files</span>
                 </button>
               </div>
-              
               <div id="fileList" class="file-list"></div>
-              <div class="form-group" style="margin-top: 8px; display:flex; align-items:center; justify-content: space-between; gap:12px;">
-                <label for="combinedToggle" class="form-label" style="margin:0; display:flex; align-items:center; gap:8px;">
-                  <input type="checkbox" id="combinedToggle"> Create a single combined summary (max 3 files)
+              <div class="form-row" style="margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+                <label for="processImagesToggle" class="form-label" style="margin: 0; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="checkbox" id="processImagesToggle" checked>
+                  <span>Analyze images (OCR/vision)</span>
                 </label>
-                <span class="form-helper" style="margin:0;">Useful for lectures with parts split across files</span>
+                <span class="form-helper" style="margin:0;">Disable to reduce cost and speed up processing</span>
               </div>
-
-              <button id="processFiles" class="btn btn-primary btn-block btn-large" disabled>
-                <span class="btn-icon">🚀</span>
-                <span>Generate Summaries</span>
-              </button>
+              <span class="form-helper" style="margin:0;">Useful for lectures with parts split across files</span>
             </div>
           </div>
+
+          <button id="processFiles" class="btn btn-primary btn-block btn-large" disabled>
+            <span class="btn-icon">🚀</span>
+            <span>Generate Summaries</span>
+          </button>
 
           <!-- Results Section -->
           <div id="resultsSection" class="results-section" style="display: none;">
@@ -288,7 +277,7 @@
               </div>
               <div class="stat-item">
                 <span class="stat-number" id="totalDocuments">0</span>
-                <span class="stat-label">Documents Processed</span>
+                <span class="stat-label">Unique Documents</span>
               </div>
             </div>
             <div class="history-actions">
@@ -308,11 +297,7 @@
           <div id="emptyHistory" class="empty-state" style="display: none;">
             <div class="empty-icon">📝</div>
             <h3>No History Yet</h3>
-            <p>Start summarizing documents to see them here</p>
-            <button class="btn btn-primary" onclick="document.querySelector('[data-page=home]').click()">
-              <span class="btn-icon">🚀</span>
-              <span>Get Started</span>
-            </button>
+            <p>Start by uploading a document on the Home page.</p>
           </div>
         </div>
       </div>
@@ -355,347 +340,393 @@
         </div>
       </div>
 
-      <!-- Settings Page -->
+      <!-- Settings Page (Discord-like two-pane) -->
       <div id="settingsPage" class="page">
-        <header class="page-header">
-          <h2>Settings</h2>
-          <p class="page-subtitle">Configure your preferences and API settings</p>
-        </header>
-
         <div class="main-content">
-          <!-- API Configuration Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon">🔑</div>
-              <div>
-                <h3>API Configuration</h3>
-                <p class="card-subtitle">Connect your OpenRouter account</p>
-              </div>
-            </div>
-            
-            <div class="card-body">
-              <div class="form-group">
-                <label for="apiKey" class="form-label">OpenRouter API Key</label>
-                <div class="input-with-button">
-                  <input 
-                    type="password" 
-                    id="apiKey" 
-                    class="modern-input"
-                    placeholder="sk-or-v1-..."
-                    autocomplete="off"
-                  >
-                  <button id="toggleApiKey" class="icon-button" title="Show/Hide">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10 3C5 3 1.73 7.11 1 10c.73 2.89 4 7 9 7s8.27-4.11 9-7c-.73-2.89-4-7-9-7zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
-                    </svg>
-                  </button>
-                </div>
-                <div class="form-helper">
-                  Get your API key from <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a> (supports 100+ AI models!)
+          <div class="settings-layout">
+            <!-- Left sidebar -->
+            <aside class="settings-sidebar">
+              <div class="settings-profile">
+                <div class="avatar">SQ</div>
+                <div class="profile-meta">
+                  <strong>Squailor</strong>
+                  <span>AI Summarizer</span>
                 </div>
               </div>
-              
-              <button id="saveApiKey" class="btn btn-success">
-                <span class="btn-icon">✓</span>
-                <span>Save & Validate Key</span>
-              </button>
-              
-              <div id="apiKeyStatus" class="status-message"></div>
-            </div>
-          </div>
+              <nav class="settings-nav">
+                <div class="settings-nav-group">App</div>
+                <button class="settings-nav-item active" data-panel="general">🔑 General</button>
+                <button class="settings-nav-item" data-panel="models">🤖 AI Models</button>
+                <button class="settings-nav-item" data-panel="image">🖼️ Image Settings</button>
+                <button class="settings-nav-item" data-panel="appearance">🎨 Appearance</button>
+                <button class="settings-nav-item" data-panel="storage">💾 Storage</button>
+                <button class="settings-nav-item" data-panel="updates">⬆️ Updates</button>
+                <button class="settings-nav-item" data-panel="about">ℹ️ About</button>
+                <div class="settings-nav-group">Privacy</div>
+                <button class="settings-nav-item" data-panel="privacy">🔒 Privacy</button>
+              </nav>
+            </aside>
 
-          <!-- Appearance Settings Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon">🎨</div>
-              <div>
-                <h3>Appearance</h3>
-                <p class="card-subtitle">Customize the look and feel</p>
-              </div>
-            </div>
-            
-            <div class="card-body">
-              <div class="form-group">
-                <label class="form-label">Theme</label>
-                <div class="theme-selector">
-                  <div class="theme-option" data-theme="dark">
-                    <div class="theme-preview dark-preview">
-                      <div class="preview-header"></div>
-                      <div class="preview-content">
-                        <div class="preview-card"></div>
-                        <div class="preview-card"></div>
-                      </div>
-                    </div>
-                    <div class="theme-info">
-                      <strong>Dark</strong>
-                      <span>Easy on the eyes</span>
-                    </div>
-                    <div class="theme-check">✓</div>
-                  </div>
-                  
-                  <div class="theme-option" data-theme="light">
-                    <div class="theme-preview light-preview">
-                      <div class="preview-header"></div>
-                      <div class="preview-content">
-                        <div class="preview-card"></div>
-                        <div class="preview-card"></div>
-                      </div>
-                    </div>
-                    <div class="theme-info">
-                      <strong>Light</strong>
-                      <span>Clean and bright</span>
-                    </div>
-                    <div class="theme-check">✓</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Model Settings Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon">🤖</div>
-              <div>
-                <h3>AI Model</h3>
-                <p class="card-subtitle">Choose your AI model via OpenRouter</p>
-              </div>
-            </div>
-            
-            <div class="card-body">
-              <div class="form-group">
-                <label for="modelSelect" class="form-label">AI Model</label>
-                <select id="modelSelect" class="modern-select">
-                  <optgroup label="OpenAI Models">
-                    <option value="openai/gpt-4o-mini" selected>GPT-4o Mini (Recommended - Fast & Cheap)</option>
-                    <option value="openai/gpt-4o">GPT-4o (Most Capable)</option>
-                    <option value="openai/gpt-4-turbo">GPT-4 Turbo</option>
-                    <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo (Fastest)</option>
-                  </optgroup>
-                  <optgroup label="Anthropic Models">
-                    <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Excellent)</option>
-                    <option value="anthropic/claude-3-opus">Claude 3 Opus (Best Reasoning)</option>
-                    <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Fast & Cheap)</option>
-                  </optgroup>
-                  <optgroup label="Google Models">
-                    <option value="google/gemini-pro-1.5">Gemini 1.5 Pro</option>
-                    <option value="google/gemini-flash-1.5">Gemini 1.5 Flash (Fast)</option>
-                  </optgroup>
-                  <optgroup label="Meta Models">
-                    <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B</option>
-                    <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (Cheap)</option>
-                  </optgroup>
-                  <optgroup label="Other Models">
-                    <option value="mistralai/mistral-large">Mistral Large</option>
-                    <option value="perplexity/llama-3.1-sonar-large-128k-online">Perplexity Sonar (With Web Access)</option>
-                  </optgroup>
-                </select>
-                <div class="form-helper">
-                  OpenRouter gives you access to 100+ AI models. <a href="https://openrouter.ai/models" target="_blank">View all models</a>
-                </div>
+            <!-- Right content -->
+            <section class="settings-content">
+              <div class="settings-content-header">
+                <h3 id="settingsSectionTitle">General</h3>
+                <button id="settingsHeaderAction" class="btn btn-primary" style="display:none;"></button>
               </div>
 
-              <div class="info-box">
-                <div class="info-icon">💡</div>
-                <div class="info-content">
-                  <strong>Model Comparison</strong>
-                  <ul>
-                    <li><strong>GPT-4o Mini:</strong> Fast, affordable, great quality (recommended)</li>
-                    <li><strong>Claude 3.5 Sonnet:</strong> Excellent for detailed summaries</li>
-                    <li><strong>Gemini Flash:</strong> Very fast and cost-effective</li>
-                    <li><strong>Llama 3.1:</strong> Open source, good value</li>
-                  </ul>
-                  <p style="margin-top: 8px; font-size: 0.875rem; color: var(--text-secondary);">
-                    💰 Pricing varies by model. Check <a href="https://openrouter.ai/models" target="_blank">OpenRouter pricing</a>
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Storage Settings Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon">💾</div>
-              <div>
-                <h3>Storage Location</h3>
-                <p class="card-subtitle">Choose where to store document files</p>
-              </div>
-            </div>
-            
-            <div class="card-body">
-              <div class="form-group">
-                <label class="form-label">Storage Location</label>
-                <div class="storage-options">
-                  <label class="storage-option">
-                    <input type="radio" name="storageLocation" value="appdata" id="storageAppData" checked>
-                    <div class="storage-card">
-                      <div class="storage-icon">📁</div>
-                      <div class="storage-info">
-                        <strong>AppData (Default)</strong>
-                        <span>Standard Windows application data folder</span>
-                        <div class="storage-path" id="appdataPath">Loading...</div>
-                      </div>
-                    </div>
-                  </label>
-                  
-                  <label class="storage-option">
-                    <input type="radio" name="storageLocation" value="local-app" id="storageLocalApp">
-                    <div class="storage-card">
-                      <div class="storage-icon">📂</div>
-                      <div class="storage-info">
-                        <strong>App Folder</strong>
-                        <span>Store in application's directory (portable)</span>
-                        <div class="storage-path" id="localAppPath">Loading...</div>
-                      </div>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              <button id="saveStorageLocation" class="btn btn-primary">
-                <span class="btn-icon">💾</span>
-                <span>Save Storage Location</span>
-              </button>
-
-              <div id="storageStatus" class="status-message"></div>
-
-              <div class="info-box" style="margin-top: 16px;">
-                <div class="info-icon">ℹ️</div>
-                <div class="info-content">
-                  <strong>Storage Information</strong>
-                  <ul>
-                    <li><strong>AppData:</strong> Recommended for most users, integrated with Windows</li>
-                    <li><strong>App Folder:</strong> Portable, keeps data with the application</li>
-                  </ul>
-                  <div style="margin-top: 12px; padding: 12px; background: rgba(99, 102, 241, 0.1); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.3);">
-                    <strong style="color: var(--primary);">📂 Data Structure:</strong>
-                    <div style="font-family: 'Courier New', monospace; font-size: 0.875rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.6;">
-                      data/<br>
-                      ├── documents/      (your files)<br>
-                      ├── settings.json   (app settings)<br>
-                      └── keystore.enc    (encrypted API key)
+              <!-- Panels -->
+              <div id="panel-general" class="settings-panel active">
+                <!-- API Configuration Card -->
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">🔑</div>
+                    <div>
+                      <h3>API Configuration</h3>
+                      <p class="card-subtitle">Connect your OpenRouter account</p>
                     </div>
                   </div>
-                  <div style="margin-top: 12px; padding: 12px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3);">
-                    <strong style="color: var(--danger);">⚠️ Important:</strong>
-                    <span style="color: var(--text-secondary); font-size: 0.875rem;">
-                      Changing storage location will automatically move all files to the new location and clean up the old one.
-                    </span>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label for="apiKey" class="form-label">OpenRouter API Key</label>
+                      <div class="input-with-button">
+                        <input type="password" id="apiKey" class="modern-input" placeholder="sk-or-v1-..." autocomplete="off">
+                        <button id="toggleApiKey" class="icon-button" title="Show/Hide">
+                          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 3C5 3 1.73 7.11 1 10c.73 2.89 4 7 9 7s8.27-4.11 9-7c-.73-2.89-4-7-9-7zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/>
+                          </svg>
+                        </button>
+                      </div>
+                      <div class="form-helper">
+                        Get your API key from <a href="https://openrouter.ai/keys" target="_blank">OpenRouter</a> (supports 100+ AI models!)
+                      </div>
+                    </div>
+                    <button id="saveApiKey" class="btn btn-success">
+                      <span class="btn-icon">✓</span>
+                      <span>Save & Validate Key</span>
+                    </button>
+                    <div id="apiKeyStatus" class="status-message"></div>
                   </div>
                 </div>
               </div>
 
-              <div class="storage-stats" id="storageStats">
-                <div class="stat-row">
-                  <span>Files stored:</span>
-                  <strong id="statsFileCount">0</strong>
+              <div id="panel-appearance" class="settings-panel">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">🎨</div>
+                    <div>
+                      <h3>Appearance</h3>
+                      <p class="card-subtitle">Customize the look and feel</p>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label class="form-label">Theme</label>
+                      <div class="theme-selector">
+                        <div class="theme-option" data-theme="dark">
+                          <div class="theme-preview dark-preview">
+                            <div class="preview-header"></div>
+                            <div class="preview-content">
+                              <div class="preview-card"></div>
+                              <div class="preview-card"></div>
+                            </div>
+                          </div>
+                          <div class="theme-info">
+                            <strong>Dark</strong>
+                            <span>Easy on the eyes</span>
+                          </div>
+                          <div class="theme-check">✓</div>
+                        </div>
+                        <div class="theme-option" data-theme="light">
+                          <div class="theme-preview light-preview">
+                            <div class="preview-header"></div>
+                            <div class="preview-content">
+                              <div class="preview-card"></div>
+                              <div class="preview-card"></div>
+                            </div>
+                          </div>
+                          <div class="theme-info">
+                            <strong>Light</strong>
+                            <span>Clean and bright</span>
+                          </div>
+                          <div class="theme-check">✓</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="stat-row">
-                  <span>Total size:</span>
-                  <strong id="statsTotalSize">0 MB</strong>
+              </div>
+
+              <div id="panel-models" class="settings-panel">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">🤖</div>
+                    <div>
+                      <h3>AI Model</h3>
+                      <p class="card-subtitle">Choose your AI model via OpenRouter</p>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label for="modelSelect" class="form-label">AI Model</label>
+                      <select id="modelSelect" class="modern-select">
+                        <optgroup label="OpenAI Models">
+                          <option value="openai/gpt-4o-mini" selected>GPT-4o Mini (Recommended - Fast & Cheap)</option>
+                          <option value="openai/gpt-4o">GPT-4o (Most Capable)</option>
+                          <option value="openai/gpt-4-turbo">GPT-4 Turbo</option>
+                          <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo (Fastest)</option>
+                        </optgroup>
+                        <optgroup label="Anthropic Models">
+                          <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Excellent)</option>
+                          <option value="anthropic/claude-3-opus">Claude 3 Opus (Best Reasoning)</option>
+                          <option value="anthropic/claude-3-haiku">Claude 3 Haiku (Fast & Cheap)</option>
+                        </optgroup>
+                        <optgroup label="Google Models">
+                          <option value="google/gemini-pro-1.5">Gemini 1.5 Pro</option>
+                          <option value="google/gemini-flash-1.5">Gemini 1.5 Flash (Fast)</option>
+                        </optgroup>
+                        <optgroup label="Meta Models">
+                          <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B</option>
+                          <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B (Cheap)</option>
+                        </optgroup>
+                        <optgroup label="Other Models">
+                          <option value="mistralai/mistral-large">Mistral Large</option>
+                          <option value="perplexity/llama-3.1-sonar-large-128k-online">Perplexity Sonar (With Web Access)</option>
+                        </optgroup>
+                      </select>
+                      <div class="form-helper">
+                        OpenRouter gives you access to 100+ AI models. <a href="https://openrouter.ai/models" target="_blank">View all models</a>
+                      </div>
+                    </div>
+                    <div class="info-box">
+                      <div class="info-icon">💡</div>
+                      <div class="info-content">
+                        <strong>Model Comparison</strong>
+                        <ul>
+                          <li><strong>GPT-4o Mini:</strong> Fast, affordable, great quality (recommended)</li>
+                          <li><strong>Claude 3.5 Sonnet:</strong> Excellent for detailed summaries</li>
+                          <li><strong>Gemini Flash:</strong> Very fast and cost-effective</li>
+                          <li><strong>Llama 3.1:</strong> Open source, good value</li>
+                        </ul>
+                        <p style="margin-top: 8px; font-size: 0.875rem; color: var(--text-secondary);">
+                          💰 Pricing varies by model. Check <a href="https://openrouter.ai/models" target="_blank">OpenRouter pricing</a>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <!-- Updates Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon">⬆️</div>
-              <div>
-                <h3>Updates</h3>
-                <p class="card-subtitle">Check for app updates and install them</p>
-              </div>
-            </div>
-
-            <div class="card-body">
-              <div class="form-group">
-                <label class="form-label">Application Updates</label>
-                <div style="display:flex; gap:8px; align-items:center;">
-                  <button id="checkUpdatesBtn" class="btn btn-primary">Check for updates</button>
-                  <button id="installUpdateBtn" class="btn btn-success" style="display:none;">Restart & Install</button>
-                  <div id="updateStatus" style="margin-left:8px; color:var(--text-secondary);"></div>
+              <div id="panel-storage" class="settings-panel">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">💾</div>
+                    <div>
+                      <h3>Storage Location</h3>
+                      <p class="card-subtitle">Choose where to store document files</p>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label class="form-label">Storage Location</label>
+                      <div class="storage-options">
+                        <label class="storage-option">
+                          <input type="radio" name="storageLocation" value="appdata" id="storageAppData" checked>
+                          <div class="storage-card">
+                            <div class="storage-icon">📁</div>
+                            <div class="storage-info">
+                              <strong>AppData (Default)</strong>
+                              <span>Standard Windows application data folder</span>
+                              <div class="storage-path" id="appdataPath">Loading...</div>
+                            </div>
+                          </div>
+                        </label>
+                        <label class="storage-option">
+                          <input type="radio" name="storageLocation" value="local-app" id="storageLocalApp">
+                          <div class="storage-card">
+                            <div class="storage-icon">📂</div>
+                            <div class="storage-info">
+                              <strong>App Folder</strong>
+                              <span>Store in application's directory (portable)</span>
+                              <div class="storage-path" id="localAppPath">Loading...</div>
+                            </div>
+                          </div>
+                        </label>
+                      </div>
+                    </div>
+                    <button id="saveStorageLocation" class="btn btn-primary">
+                      <span class="btn-icon">💾</span>
+                      <span>Save Storage Location</span>
+                    </button>
+                    <div id="storageStatus" class="status-message"></div>
+                    <div class="info-box" style="margin-top: 16px;">
+                      <div class="info-icon">ℹ️</div>
+                      <div class="info-content">
+                        <strong>Storage Information</strong>
+                        <ul>
+                          <li><strong>AppData:</strong> Recommended for most users, integrated with Windows</li>
+                          <li><strong>App Folder:</strong> Portable, keeps data with the application</li>
+                        </ul>
+                        <div style="margin-top: 12px; padding: 12px; background: rgba(99, 102, 241, 0.1); border-radius: 8px; border: 1px solid rgba(99, 102, 241, 0.3);">
+                          <strong style="color: var(--primary);">📂 Data Structure:</strong>
+                          <div style="font-family: 'Courier New', monospace; font-size: 0.875rem; color: var(--text-secondary); margin-top: 8px; line-height: 1.6;">
+                            data/<br>
+                            ├── documents/      (your files)<br>
+                            ├── settings.json   (app settings)<br>
+                            └── keystore.enc    (encrypted API key)
+                          </div>
+                        </div>
+                        <div style="margin-top: 12px; padding: 12px; background: rgba(239, 68, 68, 0.1); border-radius: 8px; border: 1px solid rgba(239, 68, 68, 0.3);">
+                          <strong style="color: var(--danger);">⚠️ Important:</strong>
+                          <span style="color: var(--text-secondary); font-size: 0.875rem;">
+                            Changing storage location will automatically move all files to the new location and clean up the old one.
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="storage-stats" id="storageStats">
+                      <div class="stat-row">
+                        <span>Files stored:</span>
+                        <strong id="statsFileCount">0</strong>
+                      </div>
+                      <div class="stat-row">
+                        <span>Total size:</span>
+                        <strong id="statsTotalSize">0 MB</strong>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div class="form-helper">Updates are delivered via GitHub Releases. Click to check now.</div>
               </div>
-            </div>
-          </div>
 
-          <!-- App Version Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon">ℹ️</div>
-              <div>
-                <h3>App Version</h3>
-                <p class="card-subtitle">Current application version</p>
+              <div id="panel-updates" class="settings-panel">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">⬆️</div>
+                    <div>
+                      <h3>Updates</h3>
+                      <p class="card-subtitle">Check for app updates and install them</p>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label class="form-label">Application Updates</label>
+                      <div style="display:flex; gap:8px; align-items:center;">
+                        <button id="checkUpdatesBtn" class="btn btn-primary">Check for updates</button>
+                        <button id="installUpdateBtn" class="btn btn-success" style="display:none;">Restart & Install</button>
+                        <div id="updateStatus" style="margin-left:8px; color:var(--text-secondary);"></div>
+                      </div>
+                      <div class="form-helper">Updates are delivered via GitHub Releases. Click to check now.</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="card-body">
-              <div class="form-group">
-                <div id="appVersionDisplay" class="form-label">Loading...</div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Image Settings Card -->
-          <div class="card">
-            <div class="card-header">
-              <div class="card-icon">🖼️</div>
-              <div>
-                <h3>Image Settings</h3>
-                <p class="card-subtitle">Control how many images to process per document</p>
+              <div id="panel-about" class="settings-panel">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">ℹ️</div>
+                    <div>
+                      <h3>App Version</h3>
+                      <p class="card-subtitle">Current application version</p>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <div id="appVersionDisplay" class="form-label">Loading...</div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div class="card-body">
-              <div class="form-group">
-                <label for="maxImagesInput" class="form-label">Max Images per Document</label>
-                <input type="number" id="maxImagesInput" class="modern-input" min="0" max="10">
-                <div class="form-helper">Lower this to reduce API calls & cost</div>
-              </div>
-              <button id="saveMaxImages" class="btn btn-primary">
-                <span class="btn-icon">💾</span>
-                <span>Save</span>
-              </button>
-              <div id="maxImagesStatus" class="status-message"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-      <!-- Summary Completion Modal -->
-      <div id="summaryCompleteModal" class="modal">
-        <div class="modal-overlay"></div>
-        <div class="modal-content">
-          <div class="modal-header">
-            <h2>✨ Generated Summaries</h2>
-            <button class="modal-close" onclick="closeSummaryModal()">×</button>
-          </div>
-          <div class="modal-body">
-            <p class="modal-description">Your document summaries have been generated successfully!</p>
-            <div id="summaryCards" class="summary-cards-grid">
-              <!-- Summary cards will be inserted here -->
-            </div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn btn-outline" onclick="closeSummaryModal()">Close</button>
-          </div>
-        </div>
-      </div>
 
-      <script src="renderer.js"></script>
-      <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
-      <!-- Confirm Modal -->
-      <div id="confirmModal" class="modal" style="display:none;">
-        <div class="modal-overlay"></div>
-        <div class="modal-content small">
-          <div class="modal-body" id="confirmModalBody">Are you sure?</div>
-          <div class="modal-footer">
-            <button id="confirmCancelBtn" class="btn btn-outline">Cancel</button>
-            <button id="confirmOkBtn" class="btn btn-success">Confirm</button>
+              <div id="panel-image" class="settings-panel">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">🖼️</div>
+                    <div>
+                      <h3>Image Settings</h3>
+                      <p class="card-subtitle">Control how many images to process per document</p>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="form-group">
+                      <label for="maxImagesInput" class="form-label">Max Images per Document</label>
+                      <input type="number" id="maxImagesInput" class="modern-input" min="0" max="10">
+                      <div class="form-helper">Lower this to reduce API calls & cost</div>
+                    </div>
+                    <button id="saveMaxImages" class="btn btn-primary">
+                      <span class="btn-icon">💾</span>
+                      <span>Save</span>
+                    </button>
+                    <div id="maxImagesStatus" class="status-message"></div>
+                  </div>
+                </div>
+              </div>
+
+              <div id="panel-privacy" class="settings-panel">
+                <div class="card">
+                  <div class="card-header">
+                    <div class="card-icon">🔒</div>
+                    <div>
+                      <h3>Privacy</h3>
+                      <p class="card-subtitle">How your data is handled</p>
+                    </div>
+                  </div>
+                  <div class="card-body">
+                    <div class="info-box">
+                      <div class="info-icon">ℹ️</div>
+                      <div class="info-content">
+                        <strong>Local-first</strong>
+                        <ul>
+                          <li>Documents are stored locally in the app data folder you choose.</li>
+                          <li>Your API key is encrypted on disk and can be deleted anytime.</li>
+                          <li>Only minimal text/images required for summarization are sent to your selected model via OpenRouter.</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Summary Completion Modal -->
+    <div id="summaryCompleteModal" class="modal">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>✨ Generated Summaries</h2>
+          <button class="modal-close" onclick="closeSummaryModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <p class="modal-description">Your document summaries have been generated successfully!</p>
+          <div id="summaryCards" class="summary-cards-grid">
+            <!-- Summary cards will be inserted here -->
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" onclick="closeSummaryModal()">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+    <!-- Confirm Modal -->
+    <div id="confirmModal" class="modal" style="display:none;">
+      <div class="modal-overlay"></div>
+      <div class="modal-content small">
+        <div class="modal-body" id="confirmModalBody">Are you sure?</div>
+        <div class="modal-footer">
+          <button id="confirmCancelBtn" class="btn btn-outline">Cancel</button>
+          <button id="confirmOkBtn" class="btn btn-success">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Markdown renderer -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="renderer.js"></script>
   </div>
 </body>
 </html>

@@ -229,7 +229,9 @@ const defaultSettings = {
   aiModel: 'openai/gpt-4o-mini',  // Updated to OpenRouter format
   version: '1.0.0',
   // Max number of images to OCR per document (user configurable)
-  maxImageCount: 3
+  maxImageCount: 3,
+  // Whether to include images (OCR/vision) in processing
+  processImages: true
 };
 
 // Auto-detect storage location based on where data folder exists
@@ -564,13 +566,14 @@ ipcMain.handle('select-file', async () => {
 });
 
 // Process documents
-ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching') => {
+ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined) => {
   const results = [];
   const totalFiles = filePaths.length;
 
   // Load user settings for image limits
   const userSettings = await loadSettings();
   const maxImages = Number(userSettings.maxImageCount) || 3;
+  const processImages = typeof processImagesFlag === 'boolean' ? processImagesFlag : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
   // Lazy-load heavy modules to avoid increasing startup time
   if (!calculateFileHash) {
     calculateFileHash = require('./utils/fileHash').calculateFileHash;
@@ -703,12 +706,14 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
         const pdfData = await pdfParse(dataBuffer);
         text = pdfData.text;
         // Attempt to collect small page thumbnails to provide visual context
-        try {
-          if (!extractPdfImages) {
-            extractPdfImages = require('./utils/pdfImages').extractPdfImages;
-          }
-          imagesForVision = await extractPdfImages(filePath, 2);
-        } catch (_) { imagesForVision = []; }
+        if (processImages) {
+          try {
+            if (!extractPdfImages) {
+              extractPdfImages = require('./utils/pdfImages').extractPdfImages;
+            }
+            imagesForVision = await extractPdfImages(filePath, 2);
+          } catch (_) { imagesForVision = []; }
+        }
         } else if (ext === '.docx' || ext === '.doc') {
             // Lazy-load DOCX parser
             if (!parseDocx) {
@@ -718,22 +723,26 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
             }
             text = await parseDocx(filePath);
             // Try to include a few embedded images (if present)
-            try {
-              if (!extractDocxImages) {
-                extractDocxImages = require('./utils/docxParser').extractDocxImages;
-              }
-              imagesForVision = await extractDocxImages(filePath, 2);
-            } catch (_) { imagesForVision = []; }
+            if (processImages) {
+              try {
+                if (!extractDocxImages) {
+                  extractDocxImages = require('./utils/docxParser').extractDocxImages;
+                }
+                imagesForVision = await extractDocxImages(filePath, 2);
+              } catch (_) { imagesForVision = []; }
+            }
           } else if (ext === '.pptx' || ext === '.ppt') {
         text = await parsePresentation(filePath);
         // Try to extract a few representative images to enrich summarization
-        try {
-          if (!extractSlideImages) {
-            const ppt = require('./utils/pptxParser');
-            extractSlideImages = ppt.extractSlideImages;
-          }
-          imagesForVision = await extractSlideImages(filePath, maxImages);
-        } catch (_) { imagesForVision = []; }
+        if (processImages) {
+          try {
+            if (!extractSlideImages) {
+              const ppt = require('./utils/pptxParser');
+              extractSlideImages = ppt.extractSlideImages;
+            }
+            imagesForVision = await extractSlideImages(filePath, maxImages);
+          } catch (_) { imagesForVision = []; }
+        }
       }
 
       if (!text || text.trim().length === 0) {
@@ -778,14 +787,14 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
       });
 
       // Decide on vision support
-      const visionAllowed = typeof modelSupportsVision === 'function' ? modelSupportsVision(model) : false;
+      const visionAllowed = processImages && (typeof modelSupportsVision === 'function' ? modelSupportsVision(model) : false);
       const imagesToUse = visionAllowed ? imagesForVision : [];
       if (!visionAllowed && imagesForVision && imagesForVision.length) {
         event.sender.send('processing-progress', {
           fileName,
           fileIndex: i + 1,
           totalFiles,
-          status: 'Model does not support images — using text only',
+          status: processImages ? 'Model does not support images — using text only' : 'Image analysis disabled — using text only',
           stage: 'summarizing'
         });
       }
@@ -927,7 +936,7 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
 });
 
 // New: Process multiple documents into one combined/aggregate summary (max 3)
-ipcMain.handle('process-documents-combined', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching') => {
+ipcMain.handle('process-documents-combined', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined) => {
   // Enforce maximum of 3 files to control token/cost
   const inputFiles = Array.isArray(filePaths) ? filePaths.slice(0, 3) : [];
   const totalFiles = inputFiles.length;
@@ -938,6 +947,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
   // Load user settings for image limits
   const userSettings = await loadSettings();
   const maxImages = Number(userSettings.maxImageCount) || 3;
+  const processImages = typeof processImagesFlag === 'boolean' ? processImagesFlag : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
   // Lazy-load heavy modules
   if (!pdfParse) {
     pdfParse = require('pdf-parse-fork');
@@ -978,21 +988,25 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
         const dataBuffer = await fs.readFile(filePath);
         const pdfData = await pdfParse(dataBuffer);
         text = pdfData.text || '';
-        try {
-          if (!extractPdfImages) {
-            extractPdfImages = require('./utils/pdfImages').extractPdfImages;
-          }
-          imagesForVision = await extractPdfImages(filePath, 1);
-        } catch (_) { imagesForVision = []; }
+        if (processImages) {
+          try {
+            if (!extractPdfImages) {
+              extractPdfImages = require('./utils/pdfImages').extractPdfImages;
+            }
+            imagesForVision = await extractPdfImages(filePath, 1);
+          } catch (_) { imagesForVision = []; }
+        }
       } else if (ext === '.pptx' || ext === '.ppt') {
         text = await parsePresentation(filePath);
-          try {
-            if (!extractSlideImages) {
-              const ppt = require('./utils/pptxParser');
-              extractSlideImages = ppt.extractSlideImages;
-            }
-            imagesForVision = await extractSlideImages(filePath, maxImages);
-        } catch (_) { imagesForVision = []; }
+          if (processImages) {
+            try {
+              if (!extractSlideImages) {
+                const ppt = require('./utils/pptxParser');
+                extractSlideImages = ppt.extractSlideImages;
+              }
+              imagesForVision = await extractSlideImages(filePath, maxImages);
+          } catch (_) { imagesForVision = []; }
+        }
       } else if (ext === '.docx' || ext === '.doc') {
         if (!parseDocx) {
           const docx = require('./utils/docxParser');
@@ -1000,7 +1014,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
           extractDocxImages = docx.extractDocxImages;
         }
         text = await parseDocx(filePath);
-        try { imagesForVision = await extractDocxImages(filePath, 1); } catch (_) { imagesForVision = []; }
+        if (processImages) { try { imagesForVision = await extractDocxImages(filePath, 1); } catch (_) { imagesForVision = []; } }
       } else {
         text = '';
       }
@@ -1093,7 +1107,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
   let combinedSummary;
   try {
     // Respect model vision capability
-    const visionAllowed = typeof modelSupportsVision === 'function' ? modelSupportsVision(model) : false;
+    const visionAllowed = processImages && (typeof modelSupportsVision === 'function' ? modelSupportsVision(model) : false);
     const imagesToUse = visionAllowed ? collectedImages.slice(0, 3) : [];
     if (!visionAllowed && collectedImages.length) {
       // Send one notice (associate with first file)
@@ -1102,7 +1116,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
         fileName: first.fileName,
         fileIndex: 1,
         totalFiles,
-        status: 'Model does not support images — combining text only',
+        status: processImages ? 'Model does not support images — combining text only' : 'Image analysis disabled — combining text only',
         stage: 'summarizing'
       });
     }
