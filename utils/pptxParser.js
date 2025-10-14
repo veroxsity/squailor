@@ -137,42 +137,41 @@ async function extractSlideImages(filePath, maxImages = 10) {
         continue;
       }
 
-      const picNodes = findNodesByPath(slideDoc, ['p:sld', 'p:cSld', 'p:spTree', 'p:pic']);
-      for (const pic of picNodes) {
-        if (images.length >= maxImages) break;
-        // Alt text may be in p:nvPicPr/p:cNvPr/@descr or @name
+      // Traverse the slide tree and collect any a:blip r:embed occurrences (pictures and shape fills)
+      const found = [];
+      traverseSlide(slideDoc, [], (node, parents) => {
+        const relId = node?.$?.['r:embed'];
+        if (!relId) return;
+        // Find nearest alt text from parent chain if available
         let altText;
-        try {
-          const cNvPr = pic?.['p:nvPicPr']?.[0]?.['p:cNvPr']?.[0]?.$;
-          altText = cNvPr?.descr || cNvPr?.name || cNvPr?.title;
-        } catch (_) { /* noop */ }
+        for (let p = parents.length - 1; p >= 0; p--) {
+          const parent = parents[p];
+          const cNvPrPic = parent?.['p:nvPicPr']?.[0]?.['p:cNvPr']?.[0]?.$;
+          const cNvPrSp = parent?.['p:nvSpPr']?.[0]?.['p:cNvPr']?.[0]?.$;
+          const c = cNvPrPic || cNvPrSp;
+          if (c) {
+            altText = c.descr || c.name || c.title;
+            if (altText) break;
+          }
+        }
+        found.push({ relId, altText });
+      });
 
-        // Relationship id: p:blipFill/a:blip/@r:embed
-        let relId;
-        try {
-          relId = pic?.['p:blipFill']?.[0]?.['a:blip']?.[0]?.$?.['r:embed'];
-        } catch (_) { /* noop */ }
-        if (!relId) continue;
-
-        const mediaPath = relMap[relId];
+      for (const f of found) {
+        if (images.length >= maxImages) break;
+        const mediaPath = relMap[f.relId];
         if (!mediaPath) continue;
-
         const mediaFile = zip.file(mediaPath);
         if (!mediaFile) continue;
-
-        // Derive mime type from extension
         const extMatch = mediaPath.match(/\.([a-zA-Z0-9]+)$/);
         const ext = (extMatch ? extMatch[1] : '').toLowerCase();
         const mimeMap = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp' };
         const mimeType = mimeMap[ext] || 'application/octet-stream';
-
         try {
           const base64 = await mediaFile.async('base64');
           const dataUrl = `data:${mimeType};base64,${base64}`;
-          images.push({ slideNumber: slideNum, altText, mimeType, dataUrl });
-        } catch (_) {
-          // ignore read errors
-        }
+          images.push({ slideNumber: slideNum, altText: f.altText, mimeType, dataUrl });
+        } catch (_) { /* ignore */ }
       }
     }
 
@@ -197,6 +196,30 @@ function findNodesByPath(root, path) {
     level = next;
   }
   return level;
+}
+
+// Depth-first traversal to find any a:blip occurrences; callback receives node and parents chain
+function traverseSlide(node, parents, onBlip) {
+  if (!node || typeof node !== 'object') return;
+  // If this node has a:blip array
+  const blips = node['a:blip'];
+  if (Array.isArray(blips)) {
+    for (const b of blips) {
+      onBlip(b, parents.concat(node));
+    }
+  }
+  // Recurse children
+  for (const key of Object.keys(node)) {
+    if (key === '$' || key === '_') continue;
+    const val = node[key];
+    if (Array.isArray(val)) {
+      for (const child of val) {
+        traverseSlide(child, parents.concat(node), onBlip);
+      }
+    } else if (typeof val === 'object' && val) {
+      traverseSlide(val, parents.concat(node), onBlip);
+    }
+  }
 }
 
 /**

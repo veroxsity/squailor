@@ -502,10 +502,15 @@ function modelSupportsVision(model) {
   if (!model || typeof model !== 'string') return false;
   const m = model.toLowerCase();
   return (
-    m.includes('gpt-4o') ||
-    m.includes('omni') ||
-    m.includes('vision') ||
-    m.includes('claude-3.5-sonnet') || // Anthropic vision-capable on OpenRouter
+    // OpenAI/Orgs id forms
+    m.includes('gpt-4o') || m.includes('gpt4o') ||
+    // Common shorthand variants users type
+    m.includes('4o') || m.includes('4-0') ||
+    // General vision-capable model markers
+    m.includes('omni') || m.includes('vision') ||
+    // Anthropic
+    m.includes('claude-3.5-sonnet') ||
+    // OSS vision models
     m.includes('llava')
   );
 }
