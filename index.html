@@ -621,63 +621,79 @@
               </div>
             </div>
           </div>
-        </div>
-      </div>
-      <!-- Image Settings Card -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-icon">🖼️</div>
-          <div>
-            <h3>Image Settings</h3>
-            <p class="card-subtitle">Control how many images to process per document</p>
+
+          <!-- App Version Card -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon">ℹ️</div>
+              <div>
+                <h3>App Version</h3>
+                <p class="card-subtitle">Current application version</p>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <div id="appVersionDisplay" class="form-label">Loading...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Image Settings Card -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-icon">🖼️</div>
+              <div>
+                <h3>Image Settings</h3>
+                <p class="card-subtitle">Control how many images to process per document</p>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="form-group">
+                <label for="maxImagesInput" class="form-label">Max Images per Document</label>
+                <input type="number" id="maxImagesInput" class="modern-input" min="0" max="10">
+                <div class="form-helper">Lower this to reduce API calls & cost</div>
+              </div>
+              <button id="saveMaxImages" class="btn btn-primary">
+                <span class="btn-icon">💾</span>
+                <span>Save</span>
+              </button>
+              <div id="maxImagesStatus" class="status-message"></div>
+            </div>
           </div>
         </div>
-        <div class="card-body">
-          <div class="form-group">
-            <label for="maxImagesInput" class="form-label">Max Images per Document</label>
-            <input type="number" id="maxImagesInput" class="modern-input" min="0" max="10">
-            <div class="form-helper">Lower this to reduce API calls & cost</div>
+      </div>
+      <!-- Summary Completion Modal -->
+      <div id="summaryCompleteModal" class="modal">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+          <div class="modal-header">
+            <h2>✨ Generated Summaries</h2>
+            <button class="modal-close" onclick="closeSummaryModal()">×</button>
           </div>
-          <button id="saveMaxImages" class="btn btn-primary">
-            <span class="btn-icon">💾</span>
-            <span>Save</span>
-          </button>
-          <div id="maxImagesStatus" class="status-message"></div>
+          <div class="modal-body">
+            <p class="modal-description">Your document summaries have been generated successfully!</p>
+            <div id="summaryCards" class="summary-cards-grid">
+              <!-- Summary cards will be inserted here -->
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" onclick="closeSummaryModal()">Close</button>
+          </div>
         </div>
       </div>
-    </div>
-  </div>
 
-  <!-- Summary Completion Modal -->
-  <div id="summaryCompleteModal" class="modal">
-    <div class="modal-overlay"></div>
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>✨ Generated Summaries</h2>
-        <button class="modal-close" onclick="closeSummaryModal()">×</button>
-      </div>
-      <div class="modal-body">
-        <p class="modal-description">Your document summaries have been generated successfully!</p>
-        <div id="summaryCards" class="summary-cards-grid">
-          <!-- Summary cards will be inserted here -->
+      <script src="renderer.js"></script>
+      <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+      <!-- Confirm Modal -->
+      <div id="confirmModal" class="modal" style="display:none;">
+        <div class="modal-overlay"></div>
+        <div class="modal-content small">
+          <div class="modal-body" id="confirmModalBody">Are you sure?</div>
+          <div class="modal-footer">
+            <button id="confirmCancelBtn" class="btn btn-outline">Cancel</button>
+            <button id="confirmOkBtn" class="btn btn-success">Confirm</button>
+          </div>
         </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-outline" onclick="closeSummaryModal()">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <script src="renderer.js"></script>
-  <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
-  <!-- Confirm Modal -->
-  <div id="confirmModal" class="modal" style="display:none;">
-    <div class="modal-overlay"></div>
-    <div class="modal-content small">
-      <div class="modal-body" id="confirmModalBody">Are you sure?</div>
-      <div class="modal-footer">
-        <button id="confirmCancelBtn" class="btn btn-outline">Cancel</button>
-        <button id="confirmOkBtn" class="btn btn-success">Confirm</button>
       </div>
     </div>
   </div>

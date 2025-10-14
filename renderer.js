@@ -81,6 +81,19 @@ document.addEventListener('DOMContentLoaded', async () => {
       renderFileList();
     });
   }
+  
+  // App version display
+  if (window.electronAPI.getAppVersion) {
+    try {
+      const version = await window.electronAPI.getAppVersion();
+      const versionDisplay = document.getElementById('appVersionDisplay');
+      if (versionDisplay) {
+        versionDisplay.textContent = version;
+      }
+    } catch (err) {
+      console.error('Failed to load app version:', err);
+    }
+  }
 });
 
 // Toast helper

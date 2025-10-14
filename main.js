@@ -1432,6 +1432,11 @@ ipcMain.handle('save-settings', async (event, newSettings) => {
   return await saveSettings(updatedSettings);
 });
 
+// Get application version
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
+});
+
 // Change storage location
 ipcMain.handle('change-storage-location', async (event, storageLocation) => {
   try {
