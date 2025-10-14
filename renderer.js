@@ -32,6 +32,10 @@ const appdataPathDiv = document.getElementById('appdataPath');
 const localAppPathDiv = document.getElementById('localAppPath');
 const statsFileCount = document.getElementById('statsFileCount');
 const statsTotalSize = document.getElementById('statsTotalSize');
+// Image settings elements
+const maxImagesInput = document.getElementById('maxImagesInput');
+const saveMaxImagesBtn = document.getElementById('saveMaxImages');
+const maxImagesStatus = document.getElementById('maxImagesStatus');
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -51,6 +55,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
   if (settings.aiModel) {
     selectedModel = settings.aiModel;
+  }
+  // Load image settings
+  if (settings.maxImageCount !== undefined && maxImagesInput) {
+    maxImagesInput.value = settings.maxImageCount;
   }
   
   // Apply theme
@@ -345,6 +353,38 @@ if (saveStorageLocationBtn) {
     }
   });
 }
+
+  // Save image settings
+  if (saveMaxImagesBtn && maxImagesInput && maxImagesStatus) {
+    saveMaxImagesBtn.addEventListener('click', async () => {
+      const value = parseInt(maxImagesInput.value, 10);
+      if (isNaN(value) || value < 0 || value > 10) {
+        maxImagesStatus.textContent = '❌ Please enter a number between 0 and 10';
+        maxImagesStatus.className = 'status-message error';
+        maxImagesStatus.style.display = 'block';
+        return;
+      }
+      maxImagesStatus.textContent = 'Saving image settings...';
+      maxImagesStatus.className = 'status-message loading';
+      maxImagesStatus.style.display = 'block';
+      try {
+        const result = await window.electronAPI.saveSettings({ maxImageCount: value });
+        if (result.success) {
+          maxImagesStatus.textContent = '✓ Image settings saved!';
+          maxImagesStatus.className = 'status-message success';
+        } else {
+          maxImagesStatus.textContent = `❌ Failed to save: ${result.error}`;
+          maxImagesStatus.className = 'status-message error';
+        }
+      } catch (err) {
+        maxImagesStatus.textContent = `❌ Error: ${err.message}`;
+        maxImagesStatus.className = 'status-message error';
+      }
+      setTimeout(() => {
+        maxImagesStatus.style.display = 'none';
+      }, 5000);
+    });
+  }
 
 // Initialize
 if (apiKey && apiKeyInput && apiKeyStatus) {

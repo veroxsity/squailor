@@ -227,7 +227,9 @@ const defaultSettings = {
   dataPath: defaultDataPath,
   theme: 'dark',
   aiModel: 'openai/gpt-4o-mini',  // Updated to OpenRouter format
-  version: '1.0.0'
+  version: '1.0.0',
+  // Max number of images to OCR per document (user configurable)
+  maxImageCount: 3
 };
 
 // Auto-detect storage location based on where data folder exists
@@ -566,6 +568,9 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
   const results = [];
   const totalFiles = filePaths.length;
 
+  // Load user settings for image limits
+  const userSettings = await loadSettings();
+  const maxImages = Number(userSettings.maxImageCount) || 3;
   // Lazy-load heavy modules to avoid increasing startup time
   if (!calculateFileHash) {
     calculateFileHash = require('./utils/fileHash').calculateFileHash;
@@ -727,7 +732,7 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
             const ppt = require('./utils/pptxParser');
             extractSlideImages = ppt.extractSlideImages;
           }
-          imagesForVision = await extractSlideImages(filePath, 3);
+          imagesForVision = await extractSlideImages(filePath, maxImages);
         } catch (_) { imagesForVision = []; }
       }
 
@@ -930,6 +935,9 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
     return { success: false, error: 'No files provided' };
   }
 
+  // Load user settings for image limits
+  const userSettings = await loadSettings();
+  const maxImages = Number(userSettings.maxImageCount) || 3;
   // Lazy-load heavy modules
   if (!pdfParse) {
     pdfParse = require('pdf-parse-fork');
@@ -978,12 +986,12 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
         } catch (_) { imagesForVision = []; }
       } else if (ext === '.pptx' || ext === '.ppt') {
         text = await parsePresentation(filePath);
-        try {
-          if (!extractSlideImages) {
-            const ppt = require('./utils/pptxParser');
-            extractSlideImages = ppt.extractSlideImages;
-          }
-          imagesForVision = await extractSlideImages(filePath, 2);
+          try {
+            if (!extractSlideImages) {
+              const ppt = require('./utils/pptxParser');
+              extractSlideImages = ppt.extractSlideImages;
+            }
+            imagesForVision = await extractSlideImages(filePath, maxImages);
         } catch (_) { imagesForVision = []; }
       } else if (ext === '.docx' || ext === '.doc') {
         if (!parseDocx) {

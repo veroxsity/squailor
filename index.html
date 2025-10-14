@@ -623,6 +623,28 @@
           </div>
         </div>
       </div>
+      <!-- Image Settings Card -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-icon">🖼️</div>
+          <div>
+            <h3>Image Settings</h3>
+            <p class="card-subtitle">Control how many images to process per document</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="form-group">
+            <label for="maxImagesInput" class="form-label">Max Images per Document</label>
+            <input type="number" id="maxImagesInput" class="modern-input" min="0" max="10">
+            <div class="form-helper">Lower this to reduce API calls & cost</div>
+          </div>
+          <button id="saveMaxImages" class="btn btn-primary">
+            <span class="btn-icon">💾</span>
+            <span>Save</span>
+          </button>
+          <div id="maxImagesStatus" class="status-message"></div>
+        </div>
+      </div>
     </div>
   </div>
 
