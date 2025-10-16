@@ -232,7 +232,9 @@ const defaultSettings = {
   // Max number of images to OCR per document (user configurable)
   maxImageCount: 3,
   // Whether to include images (OCR/vision) in processing
-  processImages: true
+  processImages: true,
+  // Max number of files to combine into a single summary (user configurable)
+  maxCombinedFiles: 3
 };
 
 // Auto-detect storage location based on where data folder exists
@@ -939,15 +941,18 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
 
 // New: Process multiple documents into one combined/aggregate summary (max 3)
 ipcMain.handle('process-documents-combined', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined) => {
-  // Enforce maximum of 3 files to control token/cost
-  const inputFiles = Array.isArray(filePaths) ? filePaths.slice(0, 3) : [];
+  // Load user settings for max combined files
+  const userSettings = await loadSettings();
+  const cfgMaxCombined = Math.max(1, Math.min(10, Number(userSettings.maxCombinedFiles) || 3));
+  // Enforce maximum to control token/cost
+  const inputFiles = Array.isArray(filePaths) ? filePaths.slice(0, cfgMaxCombined) : [];
   const totalFiles = inputFiles.length;
   if (totalFiles === 0) {
     return { success: false, error: 'No files provided' };
   }
 
   // Load user settings for image limits
-  const userSettings = await loadSettings();
+  // (settings already loaded above, but ensure we keep reference name)
   const maxImages = Number(userSettings.maxImageCount) || 3;
   const processImages = typeof processImagesFlag === 'boolean' ? processImagesFlag : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
   // Lazy-load heavy modules
@@ -1154,6 +1159,16 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
               totalFiles,
               status: progress.type === 'chunk-start' ? `Summarizing part ${progress.chunkIndex}/${progress.totalChunks}…` : (progress.type === 'chunk-done' ? `Finished part ${progress.chunkIndex}/${progress.totalChunks}` : 'Combining parts…'),
               stage: 'summarizing'
+            });
+          });
+        } else if (progress.type === 'done') {
+          extracted.forEach((info, k) => {
+            event.sender.send('processing-progress', {
+              fileName: info.fileName,
+              fileIndex: k + 1,
+              totalFiles,
+              status: 'Summary generated',
+              stage: 'saving'
             });
           });
         }

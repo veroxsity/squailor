@@ -240,6 +240,13 @@
                 </label>
                 <span class="form-helper" style="margin:0;">Disable to reduce cost and speed up processing</span>
               </div>
+              <div class="form-row" style="margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+                <label for="combinedToggle" class="form-label" style="margin: 0; display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                  <input type="checkbox" id="combinedToggle">
+                  <span>Combine selected files into one summary</span>
+                </label>
+                <span id="combinedHelperLabel" class="form-helper" style="margin:0;">Limit 3 files; best for multi-part lectures</span>
+              </div>
               <span class="form-helper" style="margin:0;">Useful for lectures with parts split across files</span>
             </div>
           </div>
@@ -690,6 +697,11 @@
                       <label for="maxImagesInput" class="form-label">Max Images per Document</label>
                       <input type="number" id="maxImagesInput" class="modern-input" min="0" max="10">
                       <div class="form-helper">Lower this to reduce API calls & cost</div>
+                    </div>
+                    <div class="form-group">
+                      <label for="maxCombinedInput" class="form-label">Max Files to Combine</label>
+                      <input type="number" id="maxCombinedInput" class="modern-input" min="1" max="10">
+                      <div class="form-helper">Limit the number of files when using “Combine selected files into one summary”.</div>
                     </div>
                     <button id="saveMaxImages" class="btn btn-primary">
                       <span class="btn-icon">💾</span>

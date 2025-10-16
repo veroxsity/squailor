@@ -395,18 +395,42 @@ ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
         }
 
         if (typeof onProgress === 'function') onProgress({ type: 'combine-start' });
-        const finalResponse = await openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: combinedPrompt }
-          ],
-          temperature: 0.3,
-          max_tokens: finalMaxTokens
-        });
-        const final = finalResponse.choices[0].message.content.trim();
+        let final = '';
+        try {
+          // Prefer streaming during the final merge so the UI shows progress
+          const stream = await openai.chat.completions.create({
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: combinedPrompt }
+            ],
+            temperature: 0.3,
+            max_tokens: finalMaxTokens,
+            stream: true
+          });
+
+          for await (const part of stream) {
+            const delta = part?.choices?.[0]?.delta?.content || '';
+            if (delta) {
+              final += delta;
+              if (typeof onProgress === 'function') onProgress({ type: 'delta', deltaText: delta, totalChars: final.length });
+            }
+          }
+        } catch (e) {
+          // Fallback to non-streaming if provider/model doesn't support streaming
+          const finalResponse = await openai.chat.completions.create({
+            model: model,
+            messages: [
+              { role: 'system', content: systemPrompt },
+              { role: 'user', content: combinedPrompt }
+            ],
+            temperature: 0.3,
+            max_tokens: finalMaxTokens
+          });
+          final = (finalResponse.choices?.[0]?.message?.content || '').trim();
+        }
         if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: final.length });
-        return final;
+        return final.trim();
       }
 
       const only = chunkSummaries[0];

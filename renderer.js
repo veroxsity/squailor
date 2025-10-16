@@ -36,6 +36,8 @@ const statsTotalSize = document.getElementById('statsTotalSize');
 const maxImagesInput = document.getElementById('maxImagesInput');
 const saveMaxImagesBtn = document.getElementById('saveMaxImages');
 const maxImagesStatus = document.getElementById('maxImagesStatus');
+const maxCombinedInput = document.getElementById('maxCombinedInput');
+const combinedHelperLabel = document.getElementById('combinedHelperLabel');
 // Home page: process images toggle
 const processImagesToggle = document.getElementById('processImagesToggle');
 let processImages = true;
@@ -62,6 +64,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Load image settings
   if (settings.maxImageCount !== undefined && maxImagesInput) {
     maxImagesInput.value = settings.maxImageCount;
+  }
+  if (settings.maxCombinedFiles !== undefined && maxCombinedInput) {
+    maxCombinedInput.value = settings.maxCombinedFiles;
+  }
+  if (combinedHelperLabel) {
+    const cap = (settings.maxCombinedFiles !== undefined) ? settings.maxCombinedFiles : 3;
+    combinedHelperLabel.textContent = `Limit ${cap} file${cap === 1 ? '' : 's'}; best for multi-part lectures`;
   }
   // Load processImages preference
   if (typeof settings.processImages === 'boolean') {
@@ -423,7 +432,7 @@ if (saveStorageLocationBtn) {
   });
 }
 
-  // Save image settings
+  // Save image and combine settings
   if (saveMaxImagesBtn && maxImagesInput && maxImagesStatus) {
     saveMaxImagesBtn.addEventListener('click', async () => {
       const value = parseInt(maxImagesInput.value, 10);
@@ -433,14 +442,24 @@ if (saveStorageLocationBtn) {
         maxImagesStatus.style.display = 'block';
         return;
       }
+      let combinedVal = maxCombinedInput ? parseInt(maxCombinedInput.value, 10) : 3;
+      if (isNaN(combinedVal) || combinedVal < 1 || combinedVal > 10) {
+        maxImagesStatus.textContent = '❌ Max combined files must be between 1 and 10';
+        maxImagesStatus.className = 'status-message error';
+        maxImagesStatus.style.display = 'block';
+        return;
+      }
       maxImagesStatus.textContent = 'Saving image settings...';
       maxImagesStatus.className = 'status-message loading';
       maxImagesStatus.style.display = 'block';
       try {
-        const result = await window.electronAPI.saveSettings({ maxImageCount: value });
+        const result = await window.electronAPI.saveSettings({ maxImageCount: value, maxCombinedFiles: combinedVal });
         if (result.success) {
           maxImagesStatus.textContent = '✓ Image settings saved!';
           maxImagesStatus.className = 'status-message success';
+          if (combinedHelperLabel) {
+            combinedHelperLabel.textContent = `Limit ${combinedVal} file${combinedVal === 1 ? '' : 's'}; best for multi-part lectures`;
+          }
         } else {
           maxImagesStatus.textContent = `❌ Failed to save: ${result.error}`;
           maxImagesStatus.className = 'status-message error';
@@ -533,9 +552,10 @@ function renderFileList() {
   }
 
   // Cap at 3 files if combined mode is on
-  const filesToShow = processCombined ? selectedFiles.slice(0, 3) : selectedFiles;
-  if (processCombined && selectedFiles.length > 3) {
-    showToast('Combined mode supports up to 3 files. Extra files are ignored.', 'info');
+  const maxCombined = (maxCombinedInput && parseInt(maxCombinedInput.value, 10)) || 3;
+  const filesToShow = processCombined ? selectedFiles.slice(0, maxCombined) : selectedFiles;
+  if (processCombined && selectedFiles.length > maxCombined) {
+    showToast(`Combined mode supports up to ${maxCombined} files. Extra files are ignored.`, 'info');
   }
 
   fileListDiv.innerHTML = filesToShow.map((filePath, index) => {
@@ -736,8 +756,9 @@ if (processFilesBtn && resultsDiv && resultsSection) {
 
     try {
       if (processCombined) {
+        const maxCombined = (maxCombinedInput && parseInt(maxCombinedInput.value, 10)) || 3;
         const combined = await window.electronAPI.processDocumentsCombined(
-          selectedFiles.slice(0, 3),
+          selectedFiles.slice(0, maxCombined),
           summaryType,
           apiKey,
           responseTone,
