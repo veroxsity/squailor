@@ -54,5 +54,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateDownloaded: (callback) => ipcRenderer.on('update-downloaded', (event, info) => callback(info)),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   installUpdate: (restartImmediately = true) => ipcRenderer.invoke('install-update', restartImmediately),
-  getAppVersion: () => ipcRenderer.invoke('get-app-version')
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  // Q&A about a summary
+  askSummaryQuestion: (folderId, question, apiKey, model) => ipcRenderer.invoke('qa-summary', { folderId, question, apiKey, model }),
+  onQaProgress: (folderId, callback) => ipcRenderer.on(`qa-progress:${folderId}`, (event, data) => callback(data))
 });

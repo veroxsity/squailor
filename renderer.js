@@ -1291,6 +1291,168 @@ function viewFullSummary(index) {
     // Fallback to pre-formatted text
     contentDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">${escapeHtml(item.summary)}</pre>`;
   }
+
+  // Setup Q&A chat for this summary
+  setupSummaryQaChat(item);
+
+  // Build TOC from rendered content
+  buildSummaryTOC();
+
+  // Ensure sidebars default states
+  const split = document.getElementById('summarySplit');
+  const qaSidebar = document.getElementById('qaSidebar');
+  const qaResizer = document.getElementById('qaResizer');
+  const resizerRight = document.getElementById('qaResizerRight');
+  const tocSidebar = document.getElementById('tocSidebar');
+  const tocResizer = document.getElementById('tocResizer');
+  const openQaPref = localStorage.getItem('ui.qaOpen') === 'true';
+  const openTocPref = localStorage.getItem('ui.tocOpen') === 'true';
+  // Restore widths if saved
+  const savedQaW = localStorage.getItem('ui.qaWidth');
+  const savedTocW = localStorage.getItem('ui.tocWidth');
+  if (split) {
+    split.style.setProperty('--qa-col', '0px');
+    split.style.setProperty('--qa-resizer-col', '0px');
+    split.style.setProperty('--toc-col', '0px');
+    split.style.setProperty('--toc-resizer-col', '0px');
+  }
+  if (qaSidebar && qaResizer) {
+    qaSidebar.style.display = 'none';
+    qaResizer.style.display = 'none';
+  }
+  if (tocSidebar && tocResizer) {
+    tocSidebar.style.display = 'none';
+    tocResizer.style.display = 'none';
+  }
+
+  // Wire the open button
+  const openQaBtn = document.getElementById('openQaBtn');
+  const qaCloseBtn = document.getElementById('qaCloseBtn');
+  function openQaPanel() {
+    qaSidebar.style.display = '';
+    qaResizer.style.display = '';
+    const width = savedQaW ? parseInt(savedQaW, 10) : Math.round(window.innerWidth * 0.35);
+    split.style.setProperty('--qa-col', Math.max(260, Math.min(width, Math.round(window.innerWidth * 0.6))) + 'px');
+    split.style.setProperty('--qa-resizer-col', '6px');
+    localStorage.setItem('ui.qaOpen', 'true');
+    setTimeout(() => document.getElementById('qaInput')?.focus(), 0);
+  }
+  function closeQaPanel() {
+    split.style.setProperty('--qa-col', '0px');
+    split.style.setProperty('--qa-resizer-col', '0px');
+    qaSidebar.style.display = 'none';
+    qaResizer.style.display = 'none';
+    localStorage.setItem('ui.qaOpen', 'false');
+  }
+  if (openQaBtn && split && qaSidebar && qaResizer) {
+    openQaBtn.onclick = openQaPanel;
+  }
+  if (qaCloseBtn && split && qaSidebar && qaResizer) {
+    qaCloseBtn.onclick = closeQaPanel;
+  }
+
+  // TOC open/close
+  const openTocBtn = document.getElementById('openTocBtn');
+  const tocCloseBtn = document.getElementById('tocCloseBtn');
+  function openTocPanel() {
+    tocSidebar.style.display = '';
+    tocResizer.style.display = '';
+    const width = savedTocW ? parseInt(savedTocW, 10) : 260;
+    split.style.setProperty('--toc-col', Math.max(220, Math.min(width, Math.round(window.innerWidth * 0.4))) + 'px');
+    split.style.setProperty('--toc-resizer-col', '6px');
+    localStorage.setItem('ui.tocOpen', 'true');
+  }
+  function closeTocPanel() {
+    split.style.setProperty('--toc-col', '0px');
+    split.style.setProperty('--toc-resizer-col', '0px');
+    tocSidebar.style.display = 'none';
+    tocResizer.style.display = 'none';
+    localStorage.setItem('ui.tocOpen', 'false');
+  }
+  if (openTocBtn && split && tocSidebar && tocResizer) {
+    openTocBtn.onclick = openTocPanel;
+  }
+  if (tocCloseBtn && split && tocSidebar && tocResizer) {
+    tocCloseBtn.onclick = closeTocPanel;
+  }
+
+  // Auto-restore open state
+  if (openTocPref && tocSidebar && tocResizer) openTocPanel();
+  if (openQaPref && qaSidebar && qaResizer) openQaPanel();
+
+  // Resizer drag logic for QA (middle)
+  if (qaResizer) {
+    let dragging = false;
+    qaResizer.onmousedown = (e) => {
+      dragging = true;
+      document.body.style.userSelect = 'none';
+    };
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      const splitRect = split.getBoundingClientRect();
+      const min = 260; // px
+      const max = Math.min(window.innerWidth * 0.6, 800);
+      const used = e.clientX - splitRect.left; // width used by left + resizer
+      // grid columns: [left, 6px, sidebar]
+  const sidebarWidth = Math.max(min, Math.min(max, splitRect.width - used));
+  split.style.setProperty('--qa-col', sidebarWidth + 'px');
+    });
+    window.addEventListener('mouseup', () => {
+      dragging = false;
+      document.body.style.userSelect = '';
+      const width = split && getComputedStyle(split).getPropertyValue('--qa-col');
+      if (width) localStorage.setItem('ui.qaWidth', parseInt(width, 10));
+    });
+  }
+
+  // Right edge resizer
+  if (resizerRight) {
+    let draggingR = false;
+    resizerRight.onmousedown = () => {
+      draggingR = true;
+      document.body.style.userSelect = 'none';
+    };
+    window.addEventListener('mousemove', (e) => {
+      if (!draggingR) return;
+      const splitRect = split.getBoundingClientRect();
+      const min = 260;
+      const max = Math.min(window.innerWidth * 0.6, 800);
+      // Sidebar width from right edge drag: total - left - resizer - mouseX offset
+      const mouseFromLeft = e.clientX - splitRect.left;
+  const sidebarWidth = Math.max(min, Math.min(max, splitRect.width - mouseFromLeft));
+  split.style.setProperty('--qa-col', sidebarWidth + 'px');
+    });
+    window.addEventListener('mouseup', () => {
+      draggingR = false;
+      document.body.style.userSelect = '';
+      const width = split && getComputedStyle(split).getPropertyValue('--qa-col');
+      if (width) localStorage.setItem('ui.qaWidth', parseInt(width, 10));
+    });
+  }
+
+  // TOC resizer (drag from right edge of left panel)
+  if (tocResizer) {
+    let draggingL = false;
+    tocResizer.onmousedown = () => {
+      draggingL = true;
+      document.body.style.userSelect = 'none';
+    };
+    window.addEventListener('mousemove', (e) => {
+      if (!draggingL) return;
+      const splitRect = split.getBoundingClientRect();
+      const min = 220;
+      const max = Math.min(window.innerWidth * 0.4, 600);
+      const mouseFromLeft = e.clientX - splitRect.left;
+      const tocWidth = Math.max(min, Math.min(max, mouseFromLeft));
+      split.style.setProperty('--toc-col', tocWidth + 'px');
+    });
+    window.addEventListener('mouseup', () => {
+      draggingL = false;
+      document.body.style.userSelect = '';
+      const width = split && getComputedStyle(split).getPropertyValue('--toc-col');
+      if (width) localStorage.setItem('ui.tocWidth', parseInt(width, 10));
+    });
+  }
 }
 
 // Clear History
@@ -1509,4 +1671,168 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 });
+
+// --- Summary Q&A Chat ---
+function setupSummaryQaChat(item) {
+  const transcript = document.getElementById('qaTranscript');
+  const input = document.getElementById('qaInput');
+  const sendBtn = document.getElementById('qaSendBtn');
+  const status = document.getElementById('qaStatus');
+  if (!transcript || !input || !sendBtn) return;
+
+  // Reset transcript on each open
+  transcript.innerHTML = '';
+  status.style.display = 'none';
+
+  function appendMsg(role, text) {
+    const div = document.createElement('div');
+    div.className = 'qa-msg';
+    div.style.padding = '12px';
+    div.style.border = '1px solid var(--border)';
+    div.style.borderRadius = '10px';
+    div.style.background = role === 'user' ? 'var(--bg-secondary)' : 'var(--bg-primary)';
+    div.style.color = 'var(--text-primary)';
+    div.innerHTML = `<strong>${role === 'user' ? 'You' : 'AI'}</strong><div style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(text)}</div>`;
+    transcript.appendChild(div);
+    transcript.scrollTop = transcript.scrollHeight;
+  }
+
+  async function ask() {
+    const question = input.value.trim();
+    if (!question) return;
+    if (!apiKey) {
+      showToast('Please save your OpenRouter API key first!', 'error');
+      return;
+    }
+    appendMsg('user', question);
+    input.value = '';
+    sendBtn.disabled = true;
+    status.textContent = 'Asking...';
+    status.className = 'status-message loading';
+    status.style.display = 'block';
+
+    // Streaming area
+    const partialDiv = document.createElement('div');
+    partialDiv.className = 'qa-msg';
+    partialDiv.style.padding = '12px';
+    partialDiv.style.border = '1px solid var(--border)';
+    partialDiv.style.borderRadius = '10px';
+    partialDiv.style.background = 'var(--bg-primary)';
+    partialDiv.innerHTML = '<strong>AI</strong><div style="margin-top:6px; white-space:pre-wrap;" id="qaStreaming">...</div>';
+    transcript.appendChild(partialDiv);
+
+    // Subscribe to progress
+    const progHandler = (p) => {
+      const el = partialDiv.querySelector('#qaStreaming');
+      if (el && p && p.delta) {
+        el.textContent = (el.textContent + p.delta).slice(-5000);
+      }
+    };
+    if (window.electronAPI.onQaProgress) {
+      window.electronAPI.onQaProgress(item.folderId, progHandler);
+    }
+
+    try {
+      const res = await window.electronAPI.askSummaryQuestion(item.folderId, question, apiKey, selectedModel);
+      if (res && res.success) {
+        partialDiv.querySelector('#qaStreaming').textContent = res.answer;
+        status.textContent = '✓ Answered';
+        status.className = 'status-message success';
+      } else {
+        const msg = (res && res.error) || 'Failed to get answer';
+        partialDiv.querySelector('#qaStreaming').textContent = msg;
+        status.textContent = `❌ ${msg}`;
+        status.className = 'status-message error';
+      }
+    } catch (err) {
+      partialDiv.querySelector('#qaStreaming').textContent = err && err.message || 'Error';
+      status.textContent = `❌ ${err && err.message}`;
+      status.className = 'status-message error';
+    } finally {
+      sendBtn.disabled = false;
+      setTimeout(() => { status.style.display = 'none'; }, 4000);
+    }
+  }
+
+  sendBtn.onclick = ask;
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      ask();
+    }
+  };
+}
+
+// --- Outline (TOC) ---
+function buildSummaryTOC() {
+  const root = document.getElementById('summaryViewContent');
+  const list = document.getElementById('tocList');
+  const filter = document.getElementById('tocFilter');
+  if (!root || !list) return;
+
+  // Collect headings h1..h4
+  const headings = Array.from(root.querySelectorAll('h1, h2, h3, h4'));
+  // Ensure anchors for scrollIntoView
+  headings.forEach((h, i) => {
+    if (!h.id) {
+      h.id = 'sec-' + i + '-' + h.textContent.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-');
+    }
+  });
+
+  // Build nested list
+  list.innerHTML = '';
+  const stack = [{ level: 0, el: list }];
+  function levelNum(tag) { return parseInt(tag.substring(1), 10); }
+  headings.forEach((h) => {
+    const lvl = levelNum(h.tagName.toLowerCase());
+    const label = h.textContent.trim();
+    const id = h.id;
+
+    // Adjust stack to current level
+    while (stack.length && stack[stack.length - 1].level >= lvl) stack.pop();
+    const parent = stack[stack.length - 1].el;
+
+    const item = document.createElement('div');
+    item.className = 'toc-item' + (lvl > 1 ? ' toc-child' : '');
+    item.dataset.target = id;
+    item.innerHTML = `<span class=\"chevron\" title=\"Collapse/expand\">▾</span><span class=\"toc-text\">${escapeHtml(label)}</span>`;
+    // Scroll on text click
+    item.addEventListener('click', (ev) => {
+      if (ev.target && ev.target.classList && ev.target.classList.contains('chevron')) return; // chevron handled separately
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // active highlight
+      list.querySelectorAll('.toc-item').forEach(n => n.classList.remove('active'));
+      item.classList.add('active');
+    });
+    parent.appendChild(item);
+
+    // Prepare container for children
+    const childContainer = document.createElement('div');
+    parent.appendChild(childContainer);
+    stack.push({ level: lvl, el: childContainer });
+
+    // Chevron toggles child container
+    const chev = item.querySelector('.chevron');
+    if (chev) {
+      chev.style.cursor = 'pointer';
+      chev.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isHidden = childContainer.style.display === 'none';
+        childContainer.style.display = isHidden ? '' : 'none';
+        chev.textContent = isHidden ? '▾' : '▸';
+      });
+    }
+  });
+
+  // Filter logic
+  if (filter) {
+    filter.oninput = () => {
+      const q = filter.value.toLowerCase();
+      list.querySelectorAll('.toc-item').forEach((el) => {
+        const txt = el.querySelector('.toc-text')?.textContent.toLowerCase() || '';
+        el.style.display = txt.includes(q) ? '' : 'none';
+      });
+    };
+  }
+}
 

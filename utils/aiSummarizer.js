@@ -538,3 +538,85 @@ function modelSupportsVision(model) {
 }
 
 module.exports.modelSupportsVision = modelSupportsVision;
+
+/**
+ * Answer a user question using ONLY the provided summary as context.
+ * If the answer is not present in the summary, the model should say so.
+ * @param {string} summary - The previously generated summary text
+ * @param {string} question - The user's question
+ * @param {string} apiKey - OpenRouter API key
+ * @param {string} model - Model to use (defaults to gpt-4o-mini via OpenRouter)
+ * @param {function|null} onProgress - optional streaming callback
+ * @returns {Promise<string>} - The model's answer
+ */
+async function answerQuestionAboutSummary(summary, question, apiKey, model = 'openai/gpt-4o-mini', onProgress = null) {
+  const openai = new OpenAI({
+    apiKey,
+    baseURL: 'https://openrouter.ai/api/v1',
+    defaultHeaders: {
+      'HTTP-Referer': 'https://github.com/yourusername/squailor',
+      'X-Title': 'Squailor Document Summarizer'
+    }
+  });
+
+  const systemPrompt = `You are a helpful study assistant.
+You will be given a SUMMARY of a document and a USER QUESTION.
+Answer strictly using the information present in the SUMMARY.
+Do NOT invent information that is not stated or clearly implied by the summary.
+If the summary does not contain enough information to answer, reply: "I don't have enough information from the summary to answer that."`;
+
+  const userPrompt = `SUMMARY:\n\n${summary}\n\nQUESTION: ${question}\n\nINSTRUCTIONS:\n- Base your answer ONLY on the SUMMARY above.\n- Be concise but clear. If the answer requires steps, use a short list.\n- If uncertain or missing info, explicitly say you do not have enough information.`;
+
+  try {
+    // Try streaming first
+    let full = '';
+    try {
+      const stream = await openai.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 800,
+        stream: true
+      });
+      for await (const part of stream) {
+        const delta = part?.choices?.[0]?.delta?.content || '';
+        if (delta) {
+          full += delta;
+          if (typeof onProgress === 'function') onProgress({ type: 'delta', deltaText: delta, totalChars: full.length });
+        }
+      }
+      if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: full.length });
+      return full.trim();
+    } catch (e) {
+      const resp = await openai.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        temperature: 0.2,
+        max_tokens: 800
+      });
+      return (resp.choices?.[0]?.message?.content || '').trim();
+    }
+  } catch (error) {
+    // Mirror summarizeText error normalization
+    if (error.message && error.message.includes('Rate limit')) {
+      const waitTimeMatch = error.message.match(/Please try again in ([^.]+)/);
+      const waitTime = waitTimeMatch ? waitTimeMatch[1] : 'some time';
+      throw new Error(`RATE_LIMIT: You've hit your OpenAI API rate limit. Please wait ${waitTime} before trying again.`);
+    }
+    if (error.message && error.message.includes('insufficient_quota')) {
+      throw new Error('QUOTA_EXCEEDED: Your OpenAI account has insufficient credits.');
+    }
+    if (error.message && error.message.includes('invalid_api_key')) {
+      throw new Error('INVALID_API_KEY: Your API key is invalid or has been revoked.');
+    }
+    throw new Error(`AI Q&A failed: ${error.message}`);
+  }
+}
+
+module.exports.answerQuestionAboutSummary = answerQuestionAboutSummary;

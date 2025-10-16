@@ -9,6 +9,7 @@ let parseDocx;
 let extractDocxImages;
 let summarizeText;
 let modelSupportsVision;
+let answerQuestionAboutSummary;
 let encrypt;
 let decrypt;
 let validateEncryption;
@@ -590,6 +591,7 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
     const ai = require('./utils/aiSummarizer');
     summarizeText = ai.summarizeText;
     modelSupportsVision = ai.modelSupportsVision;
+    answerQuestionAboutSummary = ai.answerQuestionAboutSummary;
   }
 
   for (let i = 0; i < filePaths.length; i++) {
@@ -961,6 +963,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
     const ai = require('./utils/aiSummarizer');
     summarizeText = ai.summarizeText;
     modelSupportsVision = ai.modelSupportsVision;
+    answerQuestionAboutSummary = ai.answerQuestionAboutSummary;
   }
   if (!calculateFileHash) {
     calculateFileHash = require('./utils/fileHash').calculateFileHash;
@@ -1876,5 +1879,39 @@ ipcMain.handle('install-update', async (event, restartImmediately = true) => {
     return { success: true };
   } catch (err) {
     return { success: false, error: err && err.message };
+  }
+});
+
+// Q&A: answer a question about a stored summary (by folderId)
+ipcMain.handle('qa-summary', async (event, { folderId, question, apiKey, model }) => {
+  try {
+    if (!answerQuestionAboutSummary) {
+      const ai = require('./utils/aiSummarizer');
+      answerQuestionAboutSummary = ai.answerQuestionAboutSummary;
+    }
+
+    // Load the summary text from storage
+    const folderPath = path.join(documentsStoragePath, folderId);
+    const summaryPath = path.join(folderPath, 'summary.json');
+    const data = JSON.parse(await fs.readFile(summaryPath, 'utf8'));
+    const summary = data.summary || '';
+    if (!summary) {
+      return { success: false, error: 'Summary not found for this item.' };
+    }
+
+    // Provide light streaming feedback back to renderer via a channel
+    const channel = `qa-progress:${folderId}`;
+    const answer = await answerQuestionAboutSummary(summary, question, apiKey, model, (progress) => {
+      try { safeSend(mainWindow, channel, progress); } catch (_) {}
+    });
+
+    return { success: true, answer };
+  } catch (error) {
+    let errorType = 'error';
+    let displayMessage = error.message;
+    if (error.message && error.message.startsWith('RATE_LIMIT:')) { errorType = 'rate-limit'; displayMessage = error.message.replace('RATE_LIMIT: ', ''); }
+    else if (error.message && error.message.startsWith('QUOTA_EXCEEDED:')) { errorType = 'quota'; displayMessage = error.message.replace('QUOTA_EXCEEDED: ', ''); }
+    else if (error.message && error.message.startsWith('INVALID_API_KEY:')) { errorType = 'api-key'; displayMessage = error.message.replace('INVALID_API_KEY: ', ''); }
+    return { success: false, error: displayMessage, errorType };
   }
 });

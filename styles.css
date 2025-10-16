@@ -308,6 +308,13 @@ body.light-theme {
   padding: 32px;
 }
 
+/* Give pages some breathing room below the sticky navbar */
+.page.active .summary-view-content,
+.page.active .history-content,
+.page.active .main-content {
+  margin-top: 8px;
+}
+
 .page {
   display: none;
   animation: fadeIn 0.3s ease;
@@ -1415,6 +1422,19 @@ body.light-theme {
   gap: 12px;
 }
 
+/* Summary Q&A */
+.qa-transcript {
+  max-height: 300px;
+  overflow-y: auto;
+}
+.qa-transcript::-webkit-scrollbar {
+  width: 8px;
+}
+.qa-transcript::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: 6px;
+}
+
 .btn-save {
   background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
   color: white;
@@ -2035,7 +2055,7 @@ body.light-theme {
 /* Summary View Page */
 .summary-view-content {
   max-width: 1200px;
-  margin: 0 auto;
+  margin: 0 auto 40px auto;
 }
 
 .summary-view-container {
@@ -2045,6 +2065,8 @@ body.light-theme {
   overflow: hidden;
   box-shadow: var(--shadow-lg);
   backdrop-filter: blur(10px);
+  /* Allow this grid column to shrink within CSS grid to prevent cutting off adjacent columns */
+  min-width: 0;
 }
 
 .summary-view-header {
@@ -2054,6 +2076,9 @@ body.light-theme {
   padding: 24px;
   border-bottom: 1px solid var(--border);
   background: var(--bg-secondary);
+  position: sticky;
+  top: 0;
+  z-index: 2;
 }
 
 .summary-view-info {
@@ -2093,13 +2118,181 @@ body.light-theme {
 
 .summary-view-body {
   padding: 32px;
-  max-height: calc(100vh - 300px);
+  /* Let the page scroll instead of an inner scroller to avoid clipped content */
+  max-height: none;
+  overflow: visible;
+}
+
+/* Split layout for summary + chat sidebar */
+/* Summary Split Layout with configurable columns */
+.summary-split {
+  /* CSS variables allow JS to control widths without rewriting classes */
+  --toc-col: 0px;               /* left outline width when open */
+  --toc-resizer-col: 0px;       /* left resizer (6px when open) */
+  --summary-col: 1fr;           /* main center */
+  --qa-resizer-col: 0px;        /* middle resizer to chat (6px when open) */
+  --qa-col: 0px;                /* right chat width when open */
+
+  display: grid;
+  grid-template-columns: var(--toc-col) var(--toc-resizer-col) var(--summary-col) var(--qa-resizer-col) var(--qa-col);
+  gap: 0;
+  align-items: stretch;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  width: 100vw;
+}
+
+/* Fix child positions within the 5-column grid */
+.toc-sidebar { grid-column: 1; }
+.toc-resizer { grid-column: 2; }
+.summary-view-container { grid-column: 3; }
+.qa-resizer { grid-column: 4; }
+.qa-sidebar { grid-column: 5; }
+
+.qa-resizer {
+  width: 6px;
+  background: var(--bg-secondary);
+  border: none;
+  cursor: col-resize;
+  position: relative;
+  z-index: 20; /* ensure draggable above content */
+  height: 100%;
+}
+.qa-resizer:hover { background: var(--bg-tertiary); }
+
+/* Left (TOC) resizer */
+.toc-resizer {
+  width: 6px;
+  background: var(--bg-secondary);
+  border: none;
+  cursor: col-resize;
+  position: relative;
+  z-index: 20;
+  height: 100%;
+}
+.toc-resizer:hover { background: var(--bg-tertiary); }
+
+.qa-sidebar {
+  background: var(--card-bg);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto; /* header, transcript, input, status */
+  min-width: 260px;
+  width: 100%;
+  position: sticky;
+  top: 88px; /* below navbar */
+  height: calc(100vh - 88px);
+  overflow: hidden; /* contain child scroll */
+}
+
+/* Right-edge resizer inside the sidebar */
+.qa-resizer-edge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  background: transparent; /* invisible handle */
+  z-index: 25;
+}
+
+.qa-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.qa-title { font-weight: 700; }
+
+.qa-transcript {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   overflow-y: auto;
+  /* Ensure it can grow to fill the 1fr row and not be capped to 300px from older rule */
+  max-height: none;
+  min-height: 0;
+}
+
+.qa-input-row {
+  display: flex;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-primary);
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+}
+
+/* Optional: status message row styling inside sidebar */
+#qaStatus.status-message {
+  margin: 8px 12px 12px 12px;
+}
+
+@media (max-width: 900px) {
+  .summary-split.sidebar-open {
+    grid-template-columns: 1fr 6px minmax(220px, 60vw);
+  }
 }
 
 .back-button {
   margin-bottom: 16px;
 }
+
+/* Outline (TOC) Sidebar */
+.toc-sidebar {
+  background: var(--card-bg);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  min-width: 220px;
+  width: 100%;
+  position: sticky;
+  top: 88px;
+  height: calc(100vh - 88px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.toc-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-secondary);
+}
+.toc-title { font-weight: 700; }
+
+.toc-tools { padding: 10px 12px; border-bottom: 1px solid var(--border); background: var(--bg-primary); }
+.toc-tools .modern-input { font-family: inherit; padding: 10px 12px; }
+
+.toc-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text-primary);
+}
+.toc-item:hover { background: var(--bg-secondary); }
+.toc-item .chevron { opacity: 0.7; }
+.toc-item.active { background: rgba(102,126,234,0.12); color: var(--primary); }
+.toc-child { margin-left: 18px; }
 
 /* Markdown Content Styles */
 .markdown-content {

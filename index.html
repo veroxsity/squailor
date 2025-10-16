@@ -315,8 +315,24 @@
         </header>
 
         <div class="main-content summary-view-content">
-          <!-- Summary Container -->
-          <div class="summary-view-container">
+          <div class="summary-split" id="summarySplit">
+            <!-- Left: Outline Sidebar (hidden until open) -->
+            <aside class="toc-sidebar" id="tocSidebar" style="display:none;">
+              <div class="toc-header">
+                <div class="toc-title">Outline</div>
+                <button class="icon-btn" id="tocCloseBtn" title="Close">✖️</button>
+              </div>
+              <div class="toc-tools">
+                <input id="tocFilter" class="modern-input" type="text" placeholder="Filter sections..." autocomplete="off" />
+              </div>
+              <nav id="tocList" class="toc-list"></nav>
+            </aside>
+
+            <!-- Left Resizer (hidden until left is open) -->
+            <div class="toc-resizer" id="tocResizer" style="display:none;" title="Drag to resize"></div>
+
+            <!-- Center: Summary Container -->
+            <div class="summary-view-container">
             <div class="summary-view-header">
               <div class="summary-view-info">
                 <div class="summary-view-icon">✨</div>
@@ -326,16 +342,39 @@
                 </div>
               </div>
               <div class="summary-view-actions">
+                <button class="btn btn-outline btn-small" id="openTocBtn">☰ Outline</button>
                 <button class="btn btn-outline btn-small" id="copySummaryView">Copy</button>
                 <button class="btn btn-outline btn-small" id="exportSummaryMD">MD</button>
                 <button class="btn btn-outline btn-small" id="exportSummaryTXT">TXT</button>
                 <button class="btn btn-outline btn-small" id="shareSummaryView">Share</button>
+                <button class="btn btn-primary btn-small" id="openQaBtn">💬 Ask AI</button>
               </div>
             </div>
             
-            <div class="summary-view-body markdown-content" id="summaryViewContent">
-              <div class="viewer-loading">Loading summary...</div>
+              <div class="summary-view-body">
+                <div class="markdown-content" id="summaryViewContent">
+                  <div class="viewer-loading">Loading summary...</div>
+                </div>
+              </div>
             </div>
+
+            <!-- Middle: Resizer (hidden until open) -->
+            <div class="qa-resizer" id="qaResizer" style="display:none;" title="Drag to resize"></div>
+
+            <!-- Right: Sticky Chat Sidebar (hidden until open) -->
+            <aside class="qa-sidebar" id="qaSidebar" style="display:none;">
+              <div class="qa-header">
+                <div class="qa-title">Chat about this summary</div>
+                <button class="icon-btn" id="qaCloseBtn" title="Close">✖️</button>
+              </div>
+              <div id="qaTranscript" class="qa-transcript"></div>
+              <div class="qa-input-row">
+                <input id="qaInput" class="modern-input" type="text" placeholder="Ask a question about the summary..." autocomplete="off" />
+                <button id="qaSendBtn" class="btn btn-primary"><span>Ask</span></button>
+              </div>
+              <div id="qaStatus" class="status-message" style="display:none;"></div>
+              <div class="qa-resizer-edge" id="qaResizerRight" title="Drag to resize"></div>
+            </aside>
           </div>
         </div>
       </div>
