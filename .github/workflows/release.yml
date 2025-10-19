@@ -20,6 +20,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -27,27 +30,29 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
+        shell: pwsh
         run: |
-          npm ci || npm install --no-audit --no-fund
+          npm ci
+          if ($LASTEXITCODE -ne 0) { npm install --no-audit --no-fund }
 
       # Build per-OS, passing the tag as the version to electron-builder wrapper
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          node ./scripts/build.js "${{ github.ref_name }}" --win
+          node ./scripts/build.js "${{ github.ref_name }}" --win --publish=never
 
       - name: Build macOS
         if: matrix.os == 'macos-latest'
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: 'false'
         run: |
-          node ./scripts/build.js "${{ github.ref_name }}" --mac
+          node ./scripts/build.js "${{ github.ref_name }}" --mac --publish=never
 
       - name: Build Linux
         if: matrix.os == 'ubuntu-latest'
         run: |
-          node ./scripts/build.js "${{ github.ref_name }}" --linux
+          node ./scripts/build.js "${{ github.ref_name }}" --linux --publish=never
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -66,6 +71,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
       - name: Setup Node (for release notes)
         uses: actions/setup-node@v4
@@ -73,17 +81,19 @@ jobs:
           node-version: '20'
 
       - name: Install deps for AI generator
+        shell: pwsh
         run: |
-          npm ci --omit=dev || npm i --omit=dev
+          npm ci --omit=dev
+          if ($LASTEXITCODE -ne 0) { npm i --omit=dev }
 
-      - name: Generate AI release notes (with fallback)
+      - name: Generate release notes
         id: gen_notes
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENAI_API_BASE: https://openrouter.ai/api/v1
           OPENROUTER_MODEL: openai/gpt-4o-mini
         run: |
-          node ./scripts/generate-ai-release-notes.js "${{ github.ref_name }}" || pwsh ./scripts/release-notes.ps1 "${{ github.ref_name }}"
+          node ./scripts/generate-ai-release-notes.js "${{ github.ref_name }}"
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
@@ -100,18 +110,17 @@ jobs:
           files: |
             dist/*.exe
             dist/*.exe.blockmap
-            dist/*-win.zip
+            dist/*-win*.zip
             dist/app-update.yml
             dist/*.dmg
             dist/*.dmg.blockmap
-            dist/*-mac.zip
+            dist/*-mac*.zip
             dist/latest-mac.yml
             dist/*.AppImage
+            dist/*.AppImage.blockmap
             dist/*.deb
             dist/latest-linux.yml
             dist/latest.yml
-            dist/*.blockmap
-            dist/*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -55,6 +55,7 @@
       "!*.md"
     ],
     "win": {
+      "artifactName": "${productName}-Setup-${version}.${ext}",
       "target": [
         {
           "target": "nsis",
