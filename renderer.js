@@ -3,6 +3,7 @@ let apiKey = '';
 let currentTheme = localStorage.getItem('app_theme') || 'dark';
 let selectedModel = localStorage.getItem('ai_model') || 'openai/gpt-4o-mini';  // Updated default
 let summaryHistory = [];
+const SUMMARY_PREVIEW_LIMIT = 600;
 
 // DOM Elements
 const apiKeyInput = document.getElementById('apiKey');
@@ -22,6 +23,38 @@ const emptyHistoryDiv = document.getElementById('emptyHistory');
 const clearHistoryBtn = document.getElementById('clearHistory');
 const totalSummariesSpan = document.getElementById('totalSummaries');
 const totalDocumentsSpan = document.getElementById('totalDocuments');
+const appHeading = document.getElementById('appHeading');
+const appSubtitle = document.getElementById('appSubtitle');
+const appContent = document.querySelector('.app-content');
+const queueCountEl = document.getElementById('queueCount');
+const queueTokensEl = document.getElementById('queueTokens');
+const railItems = Array.from(document.querySelectorAll('.rail-item'));
+const pageElements = {
+  home: document.getElementById('homePage'),
+  history: document.getElementById('historyPage'),
+  summary: document.getElementById('summaryViewPage'),
+  settings: document.getElementById('settingsPage')
+};
+const headerCopy = {
+  home: {
+    title: 'Document workspace',
+    subtitle: 'Transform your documents into concise, intelligent summaries'
+  },
+  history: {
+    title: 'Summary history',
+    subtitle: 'Search, filter, and revisit previous summaries.'
+  },
+  settings: {
+    title: 'App settings',
+    subtitle: 'Manage API keys, models, storage, and preferences.'
+  },
+  summary: {
+    title: 'Summary workspace',
+    subtitle: 'Review generated notes, explore context, and chat with your AI assistant.'
+  }
+};
+let setSettingsPanelActive = null;
+let pendingSettingsPanel = null;
 
 // Storage settings elements
 const storageAppDataRadio = document.getElementById('storageAppData');
@@ -41,6 +74,15 @@ const combinedHelperLabel = document.getElementById('combinedHelperLabel');
 // Home page: process images toggle
 const processImagesToggle = document.getElementById('processImagesToggle');
 let processImages = true;
+
+function updateQueueStats() {
+  if (queueCountEl) {
+    queueCountEl.textContent = selectedFiles.length;
+  }
+  if (queueTokensEl) {
+    queueTokensEl.textContent = selectedFiles.length ? 'Pending…' : '—';
+  }
+}
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', async () => {
@@ -110,8 +152,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     try {
       const version = await window.electronAPI.getAppVersion();
       const versionDisplay = document.getElementById('appVersionDisplay');
+      const versionDisplayRail = document.getElementById('appVersionDisplayRail');
       if (versionDisplay) {
         versionDisplay.textContent = version;
+      }
+      if (versionDisplayRail) {
+        versionDisplayRail.textContent = `v${version}`;
       }
     } catch (err) {
       console.error('Failed to load app version:', err);
@@ -147,13 +193,15 @@ function showConfirm(message) {
       return;
     }
     body.textContent = message;
-    modal.style.display = 'block';
+    modal.hidden = false;
+    modal.classList.add('active');
 
     function cleanup() {
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
       window.removeEventListener('keydown', onKeydown);
-      modal.style.display = 'none';
+      modal.classList.remove('active');
+      modal.hidden = true;
     }
 
     function onOk() { cleanup(); resolve(true); }
@@ -168,54 +216,122 @@ function showConfirm(message) {
 }
 
 // Navigation
-const navItems = document.querySelectorAll('.nav-item');
-const pages = document.querySelectorAll('.page');
+const pageTriggers = document.querySelectorAll('[data-page]');
 
-navItems.forEach(item => {
-  item.addEventListener('click', async () => {
-    const targetPage = item.dataset.page;
-    
-    // Update nav items
-    navItems.forEach(nav => nav.classList.remove('active'));
-    item.classList.add('active');
-    
-    // Update pages
-    pages.forEach(page => page.classList.remove('active'));
-    document.getElementById(`${targetPage}Page`).classList.add('active');
-    
-    // Load history if navigating to history page
-    if (targetPage === 'history') {
-      const result = await window.electronAPI.getSummaryHistory();
-      if (result.success) {
-        summaryHistory = result.history;
-      }
-      renderHistory();
+async function loadHistoryPage() {
+  try {
+    const result = await window.electronAPI.getSummaryHistory();
+    if (result.success) {
+      summaryHistory = result.history;
     }
-    
-    // Load storage settings if navigating to settings page
-    if (targetPage === 'settings') {
-      loadStorageSettings();
+    renderHistory();
+  } catch (error) {
+    console.error('Failed to load history:', error);
+  }
+}
+
+function updateHeaderForPage(pageKey) {
+  const copy = headerCopy[pageKey] || headerCopy.home;
+  if (appHeading && copy?.title) {
+    appHeading.textContent = copy.title;
+  }
+  if (appSubtitle && copy?.subtitle) {
+    appSubtitle.textContent = copy.subtitle;
+  }
+}
+
+function setRailActive(pageKey) {
+  railItems.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.page === pageKey);
+  });
+}
+
+function activatePage(pageName, options = {}) {
+  const key = pageName === 'summaryView' ? 'summary' : pageName;
+
+  Object.entries(pageElements).forEach(([name, el]) => {
+    if (!el) return;
+    const isActive = name === key;
+    el.classList.toggle('page-active', isActive);
+    el.classList.toggle('active', isActive);
+    el.hidden = !isActive;
+  });
+
+  setRailActive(key);
+
+  if (!options.skipHeader) {
+    updateHeaderForPage(key);
+  }
+
+  if (key === 'history' && !options.skipHistory) {
+    loadHistoryPage();
+  }
+
+  if (key === 'settings' && !options.skipSettings) {
+    loadStorageSettings();
+  }
+
+  if (key === 'home' && appContent && typeof appContent.focus === 'function') {
+    requestAnimationFrame(() => appContent.focus({ preventScroll: false }));
+  }
+}
+
+pageTriggers.forEach(trigger => {
+  trigger.addEventListener('click', event => {
+    const targetPage = trigger.dataset.page;
+    if (!targetPage) return;
+    activatePage(targetPage);
+
+    if (targetPage === 'settings' && trigger.dataset.panel && typeof setSettingsPanelActive === 'function') {
+      setSettingsPanelActive(trigger.dataset.panel);
+    } else if (targetPage === 'settings' && trigger.dataset.panel) {
+      pendingSettingsPanel = trigger.dataset.panel;
     }
   });
 });
+
+const openSettingsAppearanceBtn = document.getElementById('openSettingsAppearance');
+if (openSettingsAppearanceBtn) {
+  openSettingsAppearanceBtn.addEventListener('click', () => {
+    activatePage('settings');
+    if (typeof setSettingsPanelActive === 'function') {
+      setSettingsPanelActive('appearance');
+    } else {
+      pendingSettingsPanel = 'appearance';
+    }
+  });
+}
 
 // Settings sidebar navigation
 document.addEventListener('DOMContentLoaded', () => {
   const sidebarButtons = document.querySelectorAll('.settings-nav-item');
   const panels = document.querySelectorAll('.settings-panel');
   const titleEl = document.getElementById('settingsSectionTitle');
+  const subtitleEl = document.getElementById('settingsSectionSubtitle');
   const headerAction = document.getElementById('settingsHeaderAction');
 
-  function setActive(panelId, label) {
+  const panelCopy = {
+    general: 'Manage API credentials and account basics.',
+    models: 'Pick the OpenRouter model that powers your summaries.',
+    image: 'Control OCR usage and combined summary limits.',
+    appearance: 'Choose between light and dark appearances.',
+    storage: 'Review where Squailor stores documents and adjust location.',
+    updates: 'Check for the latest release and install updates.',
+    about: 'Version details and what Squailor is all about.',
+    privacy: 'Understand how Squailor protects your data.'
+  };
+
+  setSettingsPanelActive = (panelId, labelOverride) => {
     panels.forEach(p => p.classList.remove('active'));
     const active = document.getElementById(`panel-${panelId}`);
     if (active) active.classList.add('active');
     sidebarButtons.forEach(b => b.classList.remove('active'));
     const btn = Array.from(sidebarButtons).find(b => b.dataset.panel === panelId);
     if (btn) btn.classList.add('active');
-    if (titleEl) titleEl.textContent = label || btn?.textContent?.replace(/^[^A-Za-z0-9]+\s*/, '') || 'Settings';
+    const computedLabel = labelOverride || btn?.textContent?.replace(/^[^A-Za-z0-9]+\s*/, '') || 'Settings';
+    if (titleEl) titleEl.textContent = computedLabel;
+    if (subtitleEl) subtitleEl.textContent = panelCopy[panelId] || panelCopy.general;
 
-    // Optional header action example for General/Profile
     if (panelId === 'general') {
       if (headerAction) {
         headerAction.textContent = 'Save';
@@ -225,14 +341,19 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       if (headerAction) headerAction.style.display = 'none';
     }
-  }
+  };
 
   sidebarButtons.forEach(btn => {
-    btn.addEventListener('click', () => setActive(btn.dataset.panel));
+    btn.addEventListener('click', () => setSettingsPanelActive(btn.dataset.panel));
   });
 
   // Ensure default active
-  if (document.getElementById('panel-general')) setActive('general');
+  if (pendingSettingsPanel) {
+    setSettingsPanelActive(pendingSettingsPanel);
+    pendingSettingsPanel = null;
+  } else if (document.getElementById('panel-general')) {
+    setSettingsPanelActive('general');
+  }
 });
 
 // Theme Management
@@ -545,9 +666,14 @@ if (selectFilesBtn && fileListDiv && processFilesBtn) {
 
 // Render file list
 function renderFileList() {
+  updateQueueStats();
+
   if (selectedFiles.length === 0) {
     fileListDiv.innerHTML = '';
     processFilesBtn.disabled = true;
+    if (queueTokensEl) {
+      queueTokensEl.textContent = '—';
+    }
     return;
   }
 
@@ -579,6 +705,8 @@ function renderFileList() {
       </div>
     `;
   }).join('');
+
+  processFilesBtn.disabled = false;
 }
 
 // Remove file
@@ -621,6 +749,9 @@ if (processFilesBtn && resultsDiv && resultsSection) {
     // Disable button and show processing state
     processFilesBtn.disabled = true;
     processFilesBtn.innerHTML = '<span class="loading"></span> Processing...';
+    if (queueTokensEl) {
+      queueTokensEl.textContent = 'Processing…';
+    }
     
     // Disable remove buttons during processing
     document.querySelectorAll('.remove-btn').forEach(btn => {
@@ -709,9 +840,6 @@ if (processFilesBtn && resultsDiv && resultsSection) {
             if (!ticker || !ticker.classList || !ticker.classList.contains('ai-ticker')) {
               ticker = document.createElement('div');
               ticker.className = 'ai-ticker';
-              ticker.style.fontSize = '0.8rem';
-              ticker.style.color = 'var(--text-secondary)';
-              ticker.style.marginTop = '6px';
               ticker.id = id;
               statusElement.parentNode.insertBefore(ticker, statusElement.nextSibling);
             }
@@ -803,12 +931,52 @@ if (processFilesBtn && resultsDiv && resultsSection) {
     } finally {
       processFilesBtn.disabled = false;
       processFilesBtn.innerHTML = '<span class="btn-icon">🚀</span><span>Generate Summaries</span>';
+      updateQueueStats();
+      if (queueTokensEl && selectedFiles.length === 0) {
+        queueTokensEl.textContent = '—';
+      }
     }
   });
 }
 
 // Display results
 async function displayResults(results) {
+  if (resultsSection) {
+    resultsSection.hidden = false;
+  }
+  if (resultsDiv) {
+    const inlineCards = results.map((result, index) => {
+      if (!result.success) return '';
+        const fileExt = result.fileName.split('.').pop().toUpperCase();
+        const fileIcon = fileExt === 'PDF' ? '📕' : fileExt === 'PPTX' || fileExt === 'PPT' ? '📊' : '📄';
+        const reduction = result.originalLength ? Math.round((1 - result.summary.length / result.originalLength) * 100) : null;
+      const locationLabel = result.folderId ? 'Saved to history' : 'Local only';
+        return `
+          <article class="summary-completion-card" onclick="navigateToSummary(${index})">
+            <div class="summary-card-header">
+              <div class="summary-card-icon">${fileIcon}</div>
+              <div class="summary-card-info">
+                <div class="summary-card-title">${escapeHtml(result.fileName)}</div>
+                <div class="summary-card-type">${fileExt} Document${reduction === null ? '' : ` • ${reduction}% reduction`}</div>
+              </div>
+            </div>
+            <div class="summary-card-footer">
+              <div class="summary-card-stats">
+                <div class="summary-card-stat"><span>✨</span><span>Generated</span></div>
+                <div class="summary-card-stat"><span>📁</span><span>${locationLabel}</span></div>
+              </div>
+              <div class="summary-card-action">Open →</div>
+            </div>
+          </article>
+        `;
+      }).filter(Boolean);
+    if (inlineCards.length) {
+      resultsDiv.innerHTML = inlineCards.join('');
+    } else {
+      resultsDiv.innerHTML = '<div class="summary-text">No summaries were generated in this run.</div>';
+    }
+  }
+
   // Show the modal with summary cards instead of displaying inline
   showSummaryCompletionModal(results);
   
@@ -906,7 +1074,7 @@ function showSummaryCompletionModal(results) {
       }
       
       return `
-        <div class="summary-completion-card error-card" style="opacity: 0.9; cursor: default; border-color: ${errorColor};">
+        <div class="summary-completion-card error-card" style="cursor: default; border-color: ${errorColor};">
           <div class="summary-card-header">
             <div class="summary-card-icon" style="background: ${errorColor};">${errorIcon}</div>
             <div class="summary-card-info">
@@ -915,7 +1083,7 @@ function showSummaryCompletionModal(results) {
             </div>
           </div>
           <div class="summary-card-footer">
-            <div class="summary-card-error-msg" style="color: var(--text-secondary); font-size: 0.875rem; margin-top: 8px; line-height: 1.4;">
+            <div class="summary-card-error-msg">
               ${escapeHtml(shortError)}
             </div>
           </div>
@@ -925,6 +1093,7 @@ function showSummaryCompletionModal(results) {
   }).join('');
   
   // Show modal
+  modal.hidden = false;
   modal.classList.add('active');
 }
 
@@ -933,6 +1102,7 @@ window.closeSummaryModal = function() {
   const modal = document.getElementById('summaryCompleteModal');
   if (modal) {
     modal.classList.remove('active');
+    modal.hidden = true;
   }
 };
 
@@ -989,6 +1159,15 @@ function escapeHtml(text) {
   return div.innerHTML;
 }
 
+function getSummaryPreview(summary = '') {
+  if (!summary) return '';
+  if (summary.length <= SUMMARY_PREVIEW_LIMIT) {
+    return summary;
+  }
+  const truncated = summary.slice(0, SUMMARY_PREVIEW_LIMIT).trimEnd();
+  return `${truncated}…`;
+}
+
 // History Management Functions
 async function addToHistory(result) {
   // History is now automatically saved during processing
@@ -1002,13 +1181,14 @@ function renderHistory() {
   updateHistoryStats();
   
   if (summaryHistory.length === 0) {
-    historyListDiv.style.display = 'none';
-    emptyHistoryDiv.style.display = 'block';
+    historyListDiv.innerHTML = '';
+    if (historyListDiv) historyListDiv.hidden = true;
+    if (emptyHistoryDiv) emptyHistoryDiv.hidden = false;
     return;
   }
   
-  historyListDiv.style.display = 'flex';
-  emptyHistoryDiv.style.display = 'none';
+  historyListDiv.hidden = false;
+  if (emptyHistoryDiv) emptyHistoryDiv.hidden = true;
   
   historyListDiv.innerHTML = summaryHistory.map((item, index) => {
     const date = new Date(item.timestamp);
@@ -1026,13 +1206,21 @@ function renderHistory() {
       'easy': '✨ Easy'
     };
     const toneDisplay = toneMap[item.responseTone] || '😊 Casual';
-    
+
     // Get style display name
     const styleMap = {
       'teaching': '👨‍🏫 Teaching',
       'notes': '📝 Notes'
     };
     const styleDisplay = styleMap[item.summaryStyle] || '👨‍🏫 Teaching';
+    const summaryTextId = `summaryText-${index}`;
+    const shouldTruncate = (item.summary || '').length > SUMMARY_PREVIEW_LIMIT;
+    const previewToggle = shouldTruncate
+      ? `<button class="btn btn-ghost btn-small preview-toggle" id="previewToggle-${index}" onclick="toggleHistoryPreview(${index})" aria-expanded="false">
+          <span class="btn-icon">⬇️</span>
+          <span>Expand preview</span>
+        </button>`
+      : '';
     
     return `
       <div class="history-item">
@@ -1078,7 +1266,8 @@ function renderHistory() {
             <div class="preview-label">
               <span>✨</span> Summary
             </div>
-            <div class="summary-text">${escapeHtml(item.summary)}</div>
+            <div class="summary-text" id="${summaryTextId}" data-expanded="false"></div>
+            ${previewToggle}
           </div>
         </div>
         
@@ -1098,22 +1287,53 @@ function renderHistory() {
     `;
   }).join('');
   
-  // Load document viewers for all items after DOM is updated
-  setTimeout(() => {
+  // Populate summary previews and load viewers after DOM update
+  requestAnimationFrame(() => {
     summaryHistory.forEach((item, index) => {
+      const summaryEl = document.getElementById(`summaryText-${index}`);
+      if (summaryEl) {
+        const preview = getSummaryPreview(item.summary || '');
+        summaryEl.textContent = preview;
+        summaryEl.dataset.expanded = 'false';
+        const truncated = (item.summary || '').length > SUMMARY_PREVIEW_LIMIT;
+        summaryEl.classList.toggle('truncated', truncated);
+      }
       loadDocumentViewer(index, item);
     });
-  }, 0);
+  });
 }
+
+window.toggleHistoryPreview = function(index) {
+  const textEl = document.getElementById(`summaryText-${index}`);
+  const toggleBtn = document.getElementById(`previewToggle-${index}`);
+  if (!textEl || !toggleBtn) return;
+
+  const isExpanded = textEl.dataset.expanded === 'true';
+  if (isExpanded) {
+    const preview = getSummaryPreview((summaryHistory[index] && summaryHistory[index].summary) || '');
+    textEl.textContent = preview;
+    textEl.dataset.expanded = 'false';
+    textEl.classList.add('truncated');
+    toggleBtn.setAttribute('aria-expanded', 'false');
+    toggleBtn.innerHTML = '<span class="btn-icon">⬇️</span><span>Expand preview</span>';
+  } else {
+    const fullSummary = (summaryHistory[index] && summaryHistory[index].summary) || '';
+    textEl.textContent = fullSummary;
+    textEl.dataset.expanded = 'true';
+    textEl.classList.remove('truncated');
+    toggleBtn.setAttribute('aria-expanded', 'true');
+    toggleBtn.innerHTML = '<span class="btn-icon">⬆️</span><span>Collapse preview</span>';
+  }
+};
 
 function updateHistoryStats() {
   if (totalSummariesSpan) {
-    totalSummariesSpan.textContent = summaryHistory.length;
+    totalSummariesSpan.textContent = `${summaryHistory.length} ${summaryHistory.length === 1 ? 'summary' : 'summaries'}`;
   }
   
   if (totalDocumentsSpan) {
     const uniqueFiles = new Set(summaryHistory.map(item => item.fileName)).size;
-    totalDocumentsSpan.textContent = uniqueFiles;
+    totalDocumentsSpan.textContent = `${uniqueFiles} ${uniqueFiles === 1 ? 'document' : 'documents'}`;
   }
 }
 
@@ -1253,9 +1473,7 @@ function viewFullSummary(index) {
   window.currentSummaryIndex = index;
   
   // Navigate to summary view page
-  navItems.forEach(nav => nav.classList.remove('active'));
-  pages.forEach(page => page.classList.remove('active'));
-  document.getElementById('summaryViewPage').classList.add('active');
+  activatePage('summary', { skipHistory: true, skipSettings: true, skipHeader: false });
   
   // Get tone display name
   const toneMap = {
@@ -1274,11 +1492,30 @@ function viewFullSummary(index) {
   const styleDisplay = styleMap[item.summaryStyle] || 'Teaching';
   
   // Update page content
-  document.getElementById('summaryViewTitle').textContent = item.fileName;
-  document.getElementById('summaryViewMeta').textContent = `${new Date(item.timestamp).toLocaleString()} • ${item.summaryType.toUpperCase()} • ${toneDisplay} • ${styleDisplay} • ${item.model}`;
+  const summaryHeading = document.getElementById('summaryViewHeading');
+  if (summaryHeading) {
+    summaryHeading.textContent = item.fileName;
+  }
+  const summaryMeta = document.getElementById('summaryViewMeta');
+  if (summaryMeta) {
+    summaryMeta.textContent = `${new Date(item.timestamp).toLocaleString()} • ${item.summaryType.toUpperCase()} • ${toneDisplay} • ${styleDisplay} • ${item.model}`;
+  }
   
   const reduction = Math.round((1 - item.summaryLength / item.originalLength) * 100);
-  document.getElementById('summaryViewStats').textContent = `Original: ${item.originalLength.toLocaleString()} chars • Summary: ${item.summaryLength.toLocaleString()} chars • ${reduction}% reduction`;
+  const summaryStats = document.getElementById('summaryViewStats');
+  if (summaryStats) {
+    summaryStats.textContent = `Original: ${item.originalLength.toLocaleString()} chars • Summary: ${item.summaryLength.toLocaleString()} chars • ${reduction}% reduction`;
+  }
+
+  const summaryMetaChips = document.getElementById('summaryMetaChips');
+  if (summaryMetaChips) {
+    summaryMetaChips.innerHTML = [
+      item.summaryType.toUpperCase(),
+      toneDisplay,
+      styleDisplay,
+      item.model
+    ].map(value => `<span class="meta-chip">${escapeHtml(value)}</span>`).join('');
+  }
   
   // Parse markdown and render
   const contentDiv = document.getElementById('summaryViewContent');
@@ -1509,7 +1746,7 @@ const shareSummaryViewBtn = document.getElementById('shareSummaryView');
 if (backFromSummaryBtn) {
   backFromSummaryBtn.addEventListener('click', () => {
     // Go back to history page
-    document.querySelector('[data-page="history"]').click();
+    activatePage('history');
   });
 }
 
@@ -1699,21 +1936,18 @@ function setupSummaryQaChat(item) {
   const input = document.getElementById('qaInput');
   const sendBtn = document.getElementById('qaSendBtn');
   const status = document.getElementById('qaStatus');
-  if (!transcript || !input || !sendBtn) return;
+  if (!transcript || !input || !sendBtn || !status) return;
 
   // Reset transcript on each open
   transcript.innerHTML = '';
-  status.style.display = 'none';
+  status.hidden = true;
+  status.textContent = '';
+  status.className = 'status-message';
 
   function appendMsg(role, text) {
     const div = document.createElement('div');
-    div.className = 'qa-msg';
-    div.style.padding = '12px';
-    div.style.border = '1px solid var(--border)';
-    div.style.borderRadius = '10px';
-    div.style.background = role === 'user' ? 'var(--bg-secondary)' : 'var(--bg-primary)';
-    div.style.color = 'var(--text-primary)';
-    div.innerHTML = `<strong>${role === 'user' ? 'You' : 'AI'}</strong><div style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(text)}</div>`;
+    div.className = `qa-msg ${role === 'user' ? 'user' : 'assistant'}`;
+    div.innerHTML = `<strong>${role === 'user' ? 'You' : 'AI'}</strong><div class="qa-msg-body">${escapeHtml(text)}</div>`;
     transcript.appendChild(div);
     transcript.scrollTop = transcript.scrollHeight;
   }
@@ -1730,16 +1964,12 @@ function setupSummaryQaChat(item) {
     sendBtn.disabled = true;
     status.textContent = 'Asking...';
     status.className = 'status-message loading';
-    status.style.display = 'block';
+    status.hidden = false;
 
     // Streaming area
     const partialDiv = document.createElement('div');
-    partialDiv.className = 'qa-msg';
-    partialDiv.style.padding = '12px';
-    partialDiv.style.border = '1px solid var(--border)';
-    partialDiv.style.borderRadius = '10px';
-    partialDiv.style.background = 'var(--bg-primary)';
-    partialDiv.innerHTML = '<strong>AI</strong><div style="margin-top:6px; white-space:pre-wrap;" id="qaStreaming">...</div>';
+    partialDiv.className = 'qa-msg assistant';
+    partialDiv.innerHTML = '<strong>AI</strong><div class="qa-msg-body" id="qaStreaming">...</div>';
     transcript.appendChild(partialDiv);
 
     // Subscribe to progress
@@ -1759,19 +1989,26 @@ function setupSummaryQaChat(item) {
         partialDiv.querySelector('#qaStreaming').textContent = res.answer;
         status.textContent = '✓ Answered';
         status.className = 'status-message success';
+        status.hidden = false;
       } else {
         const msg = (res && res.error) || 'Failed to get answer';
         partialDiv.querySelector('#qaStreaming').textContent = msg;
         status.textContent = `❌ ${msg}`;
         status.className = 'status-message error';
+        status.hidden = false;
       }
     } catch (err) {
       partialDiv.querySelector('#qaStreaming').textContent = err && err.message || 'Error';
       status.textContent = `❌ ${err && err.message}`;
       status.className = 'status-message error';
+      status.hidden = false;
     } finally {
       sendBtn.disabled = false;
-      setTimeout(() => { status.style.display = 'none'; }, 4000);
+      setTimeout(() => {
+        status.hidden = true;
+        status.textContent = '';
+        status.className = 'status-message';
+      }, 4000);
     }
   }
 

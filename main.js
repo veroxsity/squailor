@@ -380,6 +380,8 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 1024,
+    minHeight: 700,
     show: false, // create hidden and show when ready
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

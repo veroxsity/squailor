@@ -35,3 +35,6 @@ dist/
 
 # Local Data Dir
 data/
+
+# Workspace settings
+Squailor.code-workspace
