@@ -24,10 +24,7 @@
     "powerpoint",
     "openai"
   ],
-  "author": {
-    "name": "veroxsity",
-    "email": "dev@veroxsity.com"
-  },
+  "author": "veroxsity <veroxsity@gmail.com>",
   "license": "ISC",
   "dependencies": {
   "electron-updater": "^6.6.2",
