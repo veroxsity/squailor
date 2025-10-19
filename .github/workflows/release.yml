@@ -98,7 +98,20 @@ jobs:
           name: ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
           files: |
-            dist/**
+            dist/*.exe
+            dist/*.exe.blockmap
+            dist/*-win.zip
+            dist/app-update.yml
+            dist/*.dmg
+            dist/*.dmg.blockmap
+            dist/*-mac.zip
+            dist/latest-mac.yml
+            dist/*.AppImage
+            dist/*.deb
+            dist/latest-linux.yml
+            dist/latest.yml
+            dist/*.blockmap
+            dist/*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
