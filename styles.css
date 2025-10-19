@@ -1005,7 +1005,8 @@ body.light-theme .file-item {
   border: 2px solid rgba(255, 255, 255, 0.35);
   border-top-color: rgba(255, 255, 255, 0.9);
   display: inline-block;
-  animation: spin 0.8s linear infinite;
+  /* Pure rotation to avoid vertical jitter */
+  animation: spin-rotate 0.8s linear infinite;
 }
 
 .results-section {
@@ -1751,13 +1752,20 @@ body.light-theme .file-item {
   border: 3px solid rgba(255, 255, 255, 0.35);
   border-top-color: rgba(255, 255, 255, 0.9);
   transform: translateY(-50%);
-  animation: spin 0.8s linear infinite;
+  /* Keep centered while rotating */
+  animation: spin-centered 0.8s linear infinite;
 }
 
-@keyframes spin {
-  to {
-    transform: translateY(-50%) rotate(360deg);
-  }
+/* Spinner keyframes */
+@keyframes spin-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* For elements that must remain vertically centered while rotating */
+@keyframes spin-centered {
+  from { transform: translateY(-50%) rotate(0deg); }
+  to { transform: translateY(-50%) rotate(360deg); }
 }
 
 .modal {
