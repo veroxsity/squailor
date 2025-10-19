@@ -1,0 +1,14 @@
+{
+  "title": "What's new",
+  "sections": [
+    { "key": "highlights", "heading": "Highlights", "max": 5 },
+    { "key": "features", "heading": "Features", "match": "(^feat|feature)", "max": 10 },
+    { "key": "fixes", "heading": "Fixes", "match": "(^fix|bug|hotfix)", "max": 10 },
+    { "key": "ui", "heading": "UI/UX", "match": "(ui|ux|design|layout|style|css)", "max": 10 },
+    { "key": "performance", "heading": "Performance", "match": "(^perf|performance)", "max": 10 },
+    { "key": "other", "heading": "Other changes", "max": 10 }
+  ],
+  "footer": "This release was generated automatically.",
+  "markdown": true,
+  "bullets": true
+}

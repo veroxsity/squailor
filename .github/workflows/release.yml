@@ -1,27 +1,46 @@
-name: Build and publish release
+name: Create GitHub Release with Short Changelog
 
 on:
   push:
     tags:
-      - 'v*.*.*'
+      - 'v*'
+      - '*.*.*'
 
 jobs:
   release:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node (for repo scripts if needed)
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
-      - name: Build and publish (Windows NSIS)
-        env:
-          GH_TOKEN: ${{ secrets.PUBLISH_TOKEN }}
-        shell: pwsh
+
+      - name: Install deps for AI generator
         run: |
-          # github.ref_name is like v1.0.1; strip leading 'v' if present
-          $tag = "${{ github.ref_name }}"
-          if ($tag.StartsWith('v')) { $tag = $tag.Substring(1) }
-          Write-Host "Publishing version: $tag"
-          npm run build:installer $tag -- --publish=always
+          npm ci --omit=dev || npm i --omit=dev
+
+      - name: Generate AI release notes (with fallback)
+        id: gen_notes
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_API_BASE: https://openrouter.ai/api/v1
+          OPENROUTER_MODEL: openai/gpt-4o-mini
+        run: |
+          node ./scripts/generate-ai-release-notes.js "${{ github.ref_name }}" || pwsh ./scripts/release-notes.ps1 "${{ github.ref_name }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
