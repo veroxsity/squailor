@@ -7,6 +7,7 @@ AI-powered summarization for PDFs, Word, and PowerPoint — with live progress, 
 [![Latest Release](https://img.shields.io/github/v/release/veroxsity/Squailor)](https://github.com/veroxsity/Squailor/releases)
 [![Downloads](https://img.shields.io/github/downloads/veroxsity/Squailor/total)](https://github.com/veroxsity/Squailor/releases)
 [![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
+[![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-5A67D8)](#system-requirements)
 
 </div>
 
@@ -29,17 +30,42 @@ Squailor is a modern Electron app that turns large documents into concise, high�
 
 ## 📜 Table of Contents
 
-- Getting Started
-- Features
-- Usage
-- Settings
-- Storage & Privacy
-- Troubleshooting
-- FAQ
-- Roadmap
-- Development
-- Contributing
-- License
+- [Downloads](#-downloads)
+- [System Requirements](#-system-requirements)
+- [Getting Started](#-getting-started)
+- [Features](#-features)
+- [Usage](#-usage)
+- [Settings](#-settings)
+- [Storage & Privacy](#-storage--privacy)
+- [Screenshots & Demos](#-screenshots--demos)
+- [Troubleshooting](#-troubleshooting)
+- [FAQ](#-faq)
+- [Roadmap](#-roadmap)
+- [Development](#-development)
+- [Support](#-support)
+- [Changelog](#-changelog)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+—
+
+## ⬇️ Downloads
+
+- Latest installers and portable builds: https://github.com/veroxsity/Squailor/releases
+   - Windows: Squailor-Setup-x.y.z.exe (recommended) or ZIP portable
+   - macOS: DMG or ZIP
+   - Linux: AppImage or DEB
+
+Tip: On Windows, prefer the installer for seamless auto‑updates. Portable mode is available if you want everything in one folder.
+
+—
+
+## 🧰 System Requirements
+
+- Windows 10/11, macOS 12+, or a modern Linux distro
+- For building from source: Node.js 18+ and npm 9+
+- Internet connection and an OpenRouter API key for AI models
+- Optional (better PDF thumbnails): system dependencies for canvas on your OS
 
 —
 
@@ -49,7 +75,7 @@ Squailor is a modern Electron app that turns large documents into concise, high�
 
 2) Get an OpenRouter API key: https://openrouter.ai/keys
 
-3) Launch the app → Settings → paste your API key → Save & Validate.
+3) Launch the app → Settings → paste your OpenRouter API key → Save & Validate.
 
 4) Optional: In Settings → Image Settings, set the “Max Images per Document” to control cost and speed.
 
@@ -62,14 +88,18 @@ Build it yourself
    - cd Squailor
    - npm install
 - Run in dev
-   - npm run dev
+   - npm run start
+   - Windows (alternate): npm run dev
 - Build installers
    - npm run build       # default platform
    - npm run build:win   # Windows
    - npm run build:mac   # macOS
    - npm run build:linux # Linux
 
-Note: For best PDF thumbnail OCR, install canvas: npm install canvas
+Notes
+
+- For best PDF thumbnail OCR, install canvas: npm install canvas
+- On macOS/Linux, use "npm run start" for development. The "dev" script is Windows‑specific.
 
 —
 
@@ -92,6 +122,9 @@ Note: For best PDF thumbnail OCR, install canvas: npm install canvas
 - Storage & history
    - Per‑document folders in data/documents
    - In‑app history list, quick preview, export to .md/.txt
+- Q&A on summaries
+   - Open a summary and ask follow‑up questions in the built‑in chat
+   - Streaming answers with your selected model
 - Secure API key storage
    - Encrypted locally in data/keystore.enc
 - Auto‑updates
@@ -106,6 +139,7 @@ Note: For best PDF thumbnail OCR, install canvas: npm install canvas
 3) Choose an AI model. Defaults to openai/gpt‑4o‑mini (vision‑capable via OpenRouter).
 4) Click Generate. Watch per‑file progress cards and streaming text.
 5) Open the result, copy it, or export as Markdown/Text. Everything is saved in History.
+6) Open a summary to chat with it: ask follow‑ups in the Q&A panel.
 
 Tips
 
@@ -133,6 +167,10 @@ Storage Location
 
 - Switch between OS AppData and a local app folder. The app will move existing files safely.
 
+Portable Mode
+
+- Choose “Local app folder” in Storage to keep all data next to the executable (portable usage).
+
 API Key
 
 - Save & validate securely. Keys are encrypted at rest; you can delete them anytime.
@@ -140,6 +178,10 @@ API Key
 App Version
 
 - The Settings page shows the current app version, pulled from the runtime (helpful for support and reports).
+
+Auto‑updates
+
+- Packaged builds can check for updates under Settings → Updates. On Windows, the installer will close the main window and restart to install automatically.
 
 —
 
@@ -168,7 +210,19 @@ Privacy
 
 —
 
-## 🛠️ Troubleshooting
+## �️ Screenshots & Demos
+
+Want a quick tour of the UI and UX?
+
+- Progress & stages: see documentation/PROGRESS_VISUAL_GUIDE.md
+- Tone options: see documentation/TONE_FEATURE_VISUAL_GUIDE.md
+- Quick start: see documentation/QUICK_START.md and documentation/GETTING_STARTED.md
+
+Add your own screenshots to the repo (e.g., assets/screenshots/) and link them here to showcase the latest UI.
+
+—
+
+## �🛠️ Troubleshooting
 
 - “No text found”
    - Some PDFs are images only. Use a vision model and enable images; thumbnails will provide limited OCR context.
@@ -178,6 +232,20 @@ Privacy
    - These come from the model provider via OpenRouter. Try a cheaper/faster model or smaller inputs.
 - Exports look odd
    - Switch to Markdown export for better formatting.
+
+Update diagnostics
+
+- If an update doesn’t install on Windows, check the startup log at:
+  - %APPDATA%/Squailor/startup.log (packaged builds)
+- You can also trigger updates manually in Settings → Updates.
+
+—
+
+## ⚠️ Known Issues
+
+- Very large PDFs (50MB+) may process slowly depending on the selected model and image settings.
+- On macOS/Linux development, use `npm run start` (the `dev` script sets a Windows‑style env var).
+- Some scanned PDFs may require enabling images and selecting a vision‑capable model for best results.
 
 —
 
@@ -206,6 +274,8 @@ Which models support vision?
 
 See documentation/ for deeper architecture and change notes.
 
+Also see: documentation/SUGGESTIONS.md for a curated list of future enhancements.
+
 —
 
 ## 🧑‍💻 Development
@@ -218,6 +288,20 @@ See documentation/ for deeper architecture and change notes.
 For detailed docs, explore the documentation/ folder:
 
 - GETTING_STARTED.md, BUILD_INSTRUCTIONS.md, STORAGE_ARCHITECTURE.md, ENCRYPTION.md, POWERPOINT_PREVIEW_FIX.md, and more
+
+—
+
+## 🧩 Support
+
+- Found a bug or have a request? Open an issue: https://github.com/veroxsity/Squailor/issues
+- Check the documentation index: documentation/DOCUMENTATION_INDEX.md
+- See the changelog for version history: documentation/CHANGELOG.md
+
+—
+
+## 📝 Changelog
+
+See documentation/CHANGELOG.md for detailed release notes.
 
 —
 
