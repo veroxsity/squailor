@@ -1,120 +1,137 @@
+
 <div align="center">
 
-## 🐙 Squailor
+# 🐙 Squailor
 
-AI-powered summarization for PDFs, Word, and PowerPoint — with live progress, image OCR, and beautiful UX.
+**AI-powered document intelligence for PDFs, Word, and PowerPoint — with vision OCR, live streaming, and zero compromise on privacy.**
 
-[![Latest Release](https://img.shields.io/github/v/release/veroxsity/Squailor)](https://github.com/veroxsity/Squailor/releases)
-[![Downloads](https://img.shields.io/github/downloads/veroxsity/Squailor/total)](https://github.com/veroxsity/Squailor/releases)
-[![License: ISC](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
-[![Platforms](https://img.shields.io/badge/platforms-Windows%20%7C%20macOS%20%7C%20Linux-5A67D8)](#system-requirements)
+[![Latest Release](https://img.shields.io/github/v/release/veroxsity/Squailor?style=for-the-badge&logo=github&color=5A67D8)](https://github.com/veroxsity/Squailor/releases)
+[![Downloads](https://img.shields.io/github/downloads/veroxsity/Squailor/total?style=for-the-badge&logo=github&color=10B981)](https://github.com/veroxsity/Squailor/releases)
+[![License](https://img.shields.io/badge/license-ISC-blue.svg?style=for-the-badge)](LICENSE)
+[![Platforms](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)](#downloads)
+[![Platforms](https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white)](#downloads)
+[![Platforms](https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black)](#downloads)
+
+[📥 Download Now](https://github.com/veroxsity/Squailor/releases/latest) • [📚 Documentation](documentation/) • [🐛 Report Issue](https://github.com/veroxsity/Squailor/issues) • [💡 Suggestions](documentation/SUGGESTIONS.md)
+
+---
 
 </div>
 
-Squailor is a modern Electron app that turns large documents into concise, high‑quality summaries. It supports text‑only summarization and vision‑assisted OCR for images embedded in PPTX/DOCX and page thumbnails from PDFs. Built for speed, clarity, and control.
+---
 
-—
+## 🚀 Quick Start
 
-## ✨ Highlights
+1. **[Download the latest release](https://github.com/veroxsity/Squailor/releases/latest)** for your OS (Windows, macOS, Linux)
+2. **Get a free [OpenRouter API key](https://openrouter.ai/keys)** and paste it in Settings → API Key
+3. **Drop your PDF, PPTX, or DOCX** and click Generate — watch live streaming summaries!
 
-- Summarize PDFs, PPTX, and DOCX fast with live streaming output and per‑stage progress
-- Combine up to 3 files into a single, cohesive summary that resolves overlaps and calls out unique points
-- Vision support: extract images and OCR visible text first for higher accuracy and better context
-- Duplicate detection: content hashing prevents re‑processing identical files
-- Secure by default: API key is encrypted on disk; nothing is uploaded except your AI requests
-- Thoughtful storage: each document gets its own folder with summary.json, original file, and metadata
-- Settings that matter: choose model, tone, style, theme, storage location, and max images per doc
-- Auto‑updates (packaged builds) via GitHub Releases
+> 💡 **Pro Tip:** Enable a vision model (GPT-4o, Claude 3.5 Sonnet) to extract insights from images, charts, and slides.
 
-—
+---
 
-## 📜 Table of Contents
+## 🌟 Features at a Glance
 
-- [Downloads](#-downloads)
-- [System Requirements](#-system-requirements)
-- [Getting Started](#-getting-started)
-- [Features](#-features)
-- [Usage](#-usage)
-- [Settings](#-settings)
-- [Storage & Privacy](#-storage--privacy)
-- [Screenshots & Demos](#-screenshots--demos)
-- [Troubleshooting](#-troubleshooting)
-- [FAQ](#-faq)
-- [Roadmap](#-roadmap)
-- [Development](#-development)
-- [Support](#-support)
-- [Changelog](#-changelog)
-- [Contributing](#-contributing)
-- [License](#-license)
+- **Summarize PDFs, PowerPoint, and Word** — text and images
+- **Vision OCR:** Extracts text from images, charts, and scanned pages
+- **Combine up to 3 files** into a single, cross-referenced summary
+- **Live streaming output** and per-stage progress
+- **Q&A chat:** Ask follow-up questions about any summary
+- **Duplicate detection** (SHA-256 content hashing)
+- **Encrypted API key storage** (AES-256)
+- **Portable mode** (run from USB, all data local)
+- **Auto-updates** (Windows installer, all platforms via GitHub)
+- **No telemetry, no cloud storage, your data stays local**
 
-—
+---
+
+## 🌟 Key Features
+
+### � Universal Document Support
+- **PDFs** with text + image extraction (including scanned pages)
+- **PowerPoint** (.pptx/.ppt) with slide images and speaker notes
+- **Word** (.docx/.doc) with embedded images and full formatting
+
+### 🧠 Intelligent Summarization
+- **Multiple Styles:** Teaching explanations or bullet-point notes
+- **Flexible Length:** Short (key points), Normal (balanced), or Detailed
+- **Custom Tones:** Casual, Formal, Informative, or Easy-to-understand
+- **Smart Chunking:** Handles 100+ page documents automatically
+
+### 🎨 Vision-Powered OCR
+- **Extract from images:** Charts, graphs, diagrams, slide text
+- **Configurable limits:** Control cost with 0-10 images per document
+- **Auto-fallback:** Seamlessly switches to text-only for non-vision models
+
+### 🔗 Multi-Document Intelligence
+- **Combine up to 3 files** into one cohesive summary
+- **Cross-reference sources** with "Source 1/2/3" attributions
+- **Resolve contradictions** and highlight unique insights
+
+### ⚡ Real-Time Experience
+- **Live streaming output** — watch the AI generate summaries word-by-word
+- **Progress stages:** Duplicate check → Extract → Combine → Summarize → Save
+- **Duplicate detection** with SHA-256 content hashing (skip re-processing)
+
+### 💬 Interactive Q&A
+- **Chat with your summaries** — ask follow-up questions
+- **Context-aware answers** using the full document
+- **Streaming responses** for instant feedback
+
+---
 
 ## ⬇️ Downloads
 
-- Latest installers and portable builds: https://github.com/veroxsity/Squailor/releases
-   - Windows: Squailor-Setup-x.y.z.exe (recommended) or ZIP portable
-   - macOS: DMG or ZIP
-   - Linux: AppImage or DEB
+- [Latest installers and portable builds](https://github.com/veroxsity/Squailor/releases)
+    - **Windows:** Installer (.exe, recommended) or ZIP portable
+    - **macOS:** DMG or ZIP
+    - **Linux:** AppImage or DEB
 
-Tip: On Windows, prefer the installer for seamless auto‑updates. Portable mode is available if you want everything in one folder.
+> **Tip:** On Windows, use the installer for seamless auto-updates. Portable mode is available for all platforms.
 
-—
+---
 
 ## 🧰 System Requirements
 
 - Windows 10/11, macOS 12+, or a modern Linux distro
-- For building from source: Node.js 18+ and npm 9+
-- Internet connection and an OpenRouter API key for AI models
-- Optional (better PDF thumbnails): system dependencies for canvas on your OS
+- Node.js 18+ and npm 9+ (for building from source)
+- Internet connection and an OpenRouter API key
+- (Optional) For best PDF thumbnails: install system dependencies for [canvas](https://www.npmjs.com/package/canvas)
 
-—
+---
 
 ## 💻 Getting Started
 
-1) Download a release from the Releases page, or build from source.
+1. **Download** a release from [Releases](https://github.com/veroxsity/Squailor/releases), or build from source.
+2. **Get an OpenRouter API key:** https://openrouter.ai/keys
+3. **Launch the app → Settings → paste your API key → Save & Validate.**
+4. *(Optional)* In Settings → Image Settings, adjust “Max Images per Document” to control cost and speed.
+5. **Start summarizing from the Home page!**
 
-2) Get an OpenRouter API key: https://openrouter.ai/keys
+**Build it yourself:**
 
-3) Launch the app → Settings → paste your OpenRouter API key → Save & Validate.
+```sh
+# Clone and install
+git clone https://github.com/veroxsity/Squailor.git
+cd Squailor
+npm install
 
-4) Optional: In Settings → Image Settings, set the “Max Images per Document” to control cost and speed.
+# Run in dev
+npm run start
+# Windows (alternate): npm run dev
 
-5) Start summarizing from the Home page.
+# Build installers
+npm run build       # default platform
+npm run build:win   # Windows
+npm run build:mac   # macOS
+npm run build:linux # Linux
+```
 
-Build it yourself
+> For best PDF thumbnail OCR, install canvas: `npm install canvas`
+> On macOS/Linux, use `npm run start` for development. The `dev` script is Windows‑specific.
 
-- Clone and install
-   - git clone https://github.com/veroxsity/Squailor.git
-   - cd Squailor
-   - npm install
-- Run in dev
-   - npm run start
-   - Windows (alternate): npm run dev
-- Build installers
-   - npm run build       # default platform
-   - npm run build:win   # Windows
-   - npm run build:mac   # macOS
-   - npm run build:linux # Linux
+---
 
-Notes
-
-- For best PDF thumbnail OCR, install canvas: npm install canvas
-- On macOS/Linux, use "npm run start" for development. The "dev" script is Windows‑specific.
-
-—
-
-## 🔍 Features
-
-- Single‑file summaries
-   - Teaching style or bullet notes
-   - Short, normal, or longer length
-- Combined summaries (up to 3 files)
-   - Aggregates sources, resolves contradictions, attributes unique points (Source 1/2/3)
-- Vision‑assisted OCR
-   - PPTX/DOCX: extract images and read on‑slide text
-   - PDF: create small thumbnails for early page context (best‑effort)
-   - Automatically falls back to text‑only if model lacks vision support
-- Live progress and streaming
    - Stages: duplicate‑check → extraction → combining → summarizing → saving
    - Token/partial output arrives as it’s generated
 - Duplicate detection
