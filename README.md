@@ -2,7 +2,7 @@
 
 # 🐙 Squailor
 
-**AI-powered document intelligence for PDFs, Word, and PowerPoint — with vision OCR, live streaming, and zero compromise on privacy.**
+**Transform your documents into intelligent summaries — AI-powered analysis for PDFs, PowerPoint, and Word with live streaming, vision OCR, and complete privacy.**
 
 [![Latest Release](https://img.shields.io/github/v/release/veroxsity/Squailor?style=for-the-badge&logo=github&color=5A67D8)](https://github.com/veroxsity/Squailor/releases)
 [![Downloads](https://img.shields.io/github/downloads/veroxsity/Squailor/total?style=for-the-badge&logo=github&color=10B981)](https://github.com/veroxsity/Squailor/releases)
@@ -19,284 +19,373 @@
 
 ## 🚀 Quick Start
 
-1. **[Download the latest release](https://github.com/veroxsity/Squailor/releases/latest)** for your OS (Windows, macOS, Linux)
-2. **Get a free [OpenRouter API key](https://openrouter.ai/keys)** and paste it in Settings → API Key
-3. **Drop your PDF, PPTX, or DOCX** and click Generate — watch live streaming summaries!
+1. **[Download the latest release](https://github.com/veroxsity/Squailor/releases/latest)** for Windows, macOS, or Linux
+2. **Get a free [OpenRouter API key](https://openrouter.ai/keys)** (required — Squailor uses OpenRouter to access multiple AI providers)
+3. **Launch Squailor → Settings → paste your API key → Save & Validate**
+4. **Go to Home → drop your files → click Generate** — watch your summaries stream in real-time!
 
-> 💡 **Pro Tip:** Enable a vision model (GPT-4o, Claude 3.5 Sonnet) to extract insights from images, charts, and slides.
-
----
-
-## 🌟 Features at a Glance
-
-- **Summarize PDFs, PowerPoint, and Word** — text and images
-- **Vision OCR:** Extracts text from images, charts, and scanned pages
-- **Combine up to 3 files** into a single, cross-referenced summary
-- **Live streaming output** and per-stage progress
-- **Q&A chat:** Ask follow-up questions about any summary
-- **Duplicate detection** (SHA-256 content hashing)
-- **Encrypted API key storage** (AES-256)
-- **Portable mode** (run from USB, all data local)
-- **Auto-updates** (Windows installer, all platforms via GitHub)
-- **No telemetry, no cloud storage, your data stays local**
+> 💡 **Pro Tip:** Select a vision-capable model (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro) to extract text from images, charts, and diagrams embedded in your documents.
 
 ---
 
-## 📖 Key Features
+## 🌟 What Squailor Does
 
-### 📄 Universal Document Support
-- **PDFs** with text + image extraction (including scanned pages)
-- **PowerPoint** (.pptx/.ppt) with slide images and speaker notes
-- **Word** (.docx/.doc) with embedded images and full formatting
+Squailor is a desktop application that reads your PDFs, PowerPoint presentations, and Word documents, then uses advanced AI models (via OpenRouter) to generate concise, customizable summaries. Everything runs locally on your machine — only the text extraction and AI requests are sent to your chosen model provider.
 
-### 🧠 Intelligent Summarization
-- **Multiple Styles:** Teaching explanations or bullet-point notes
-- **Flexible Length:** Short (key points), Normal (balanced), or Detailed
-- **Custom Tones:** Casual, Formal, Informative, or Easy-to-understand
-- **Smart Chunking:** Handles 100+ page documents automatically
+### ⚡ Core Features
 
-### 🎨 Vision-Powered OCR
-- **Extract from images:** Charts, graphs, diagrams, slide text
-- **Configurable limits:** Control cost with 0-10 images per document
-- **Auto-fallback:** Seamlessly switches to text-only for non-vision models
+- **Multi-format support:** PDF, PPTX, PPT, DOCX, DOC
+- **Vision OCR:** Extracts text from embedded images, charts, diagrams, and slides (when using vision-capable models)
+- **Live streaming:** Watch summaries generate word-by-word in real-time
+- **Customizable output:**
+  - **Length:** Short (key points), Normal (balanced), or Longer (detailed)
+  - **Style:** Teaching format (paragraphs & explanations) or Notes format (bullets & concise)
+  - **Tone:** Casual, Formal, Informative, or Easy-to-understand
+- **Combined summaries:** Merge up to 3 files into one cross-referenced summary that identifies themes and resolves contradictions
+- **Duplicate detection:** SHA-256 content hashing prevents reprocessing the same document
+- **Q&A chat:** Ask follow-up questions about any generated summary with streaming responses
+- **Per-document folders:** Each summary is stored with the original file, metadata, and preview in an organized folder structure
+- **History & search:** Browse all past summaries, filter by type/tone, and quickly jump back into any document
 
-### 🔗 Multi-Document Intelligence
-- **Combine up to 3 files** into one cohesive summary
-- **Cross-reference sources** with "Source 1/2/3" attributions
-- **Resolve contradictions** and highlight unique insights
+### 🔐 Privacy & Security
 
-### ⚡ Real-Time Experience
-- **Live streaming output** — watch the AI generate summaries word-by-word
-- **Progress stages:** Duplicate check → Extract → Combine → Summarize → Save
-- **Duplicate detection** with SHA-256 content hashing (skip re-processing)
+- **Local-first:** Documents stay on your machine (stored in AppData or a portable folder you choose)
+- **Encrypted API keys:** Your OpenRouter key is encrypted at rest using AES-256
+- **Zero telemetry:** Squailor does not track usage or send analytics
+- **Portable mode:** Run from a USB drive with all data self-contained
 
-### 💬 Interactive Q&A
-- **Chat with your summaries** — ask follow-up questions
-- **Context-aware answers** using the full document
-- **Streaming responses** for instant feedback
+### 🎨 Modern UI
+
+- **Dark and light themes**
+- **Multi-page workspace:** Home (process files), History (browse past work), Settings (manage keys & preferences)
+- **Progress stages:** Visual feedback for duplicate check → extract → combine → summarize → save
+- **Export options:** Copy to clipboard, export as Markdown or TXT
 
 ---
 
 ## ⬇️ Downloads
 
-- [Latest installers and portable builds](https://github.com/veroxsity/Squailor/releases)
-  - **Windows:** Installer (.exe, recommended) or ZIP portable
-  - **macOS:** DMG or ZIP
-  - **Linux:** AppImage or DEB
+Prebuilt installers and portable builds are available on the [Releases page](https://github.com/veroxsity/Squailor/releases):
 
-> **Tip:** On Windows, use the installer for seamless auto-updates. Portable mode is available for all platforms.
+- **Windows:** `.exe` installer (with auto-updates) or portable `.zip`
+- **macOS:** `.dmg` or `.zip`
+- **Linux:** `AppImage` or `.deb`
+
+> **Tip:** The Windows installer supports seamless auto-updates via GitHub Releases. Portable mode is available on all platforms — just choose "Application folder" in Settings → Storage.
 
 ---
 
 ## 🧰 System Requirements
 
-- Windows 10/11, macOS 12+, or a modern Linux distro
-- Node.js 18+ and npm 9+ (for building from source)
-- Internet connection and an OpenRouter API key
-- (Optional) For best PDF thumbnails: install system dependencies for [canvas](https://www.npmjs.com/package/canvas)
+- **Operating System:** Windows 10/11, macOS 12+, or a modern Linux distro
+- **For building from source:**
+  - Node.js 18+ and npm 9+
+  - (Optional) System dependencies for [canvas](https://www.npmjs.com/package/canvas) if you want enhanced PDF thumbnail rendering
 
 ---
 
 ## 💻 Getting Started
 
-1. **Download** a release from [Releases](https://github.com/veroxsity/Squailor/releases), or build from source.
-2. **Get an OpenRouter API key:** https://openrouter.ai/keys
-3. **Launch the app → Settings → paste your API key → Save & Validate.**
-4. *(Optional)* In Settings → Image Settings, adjust "Max Images per Document" to control cost and speed.
-5. **Start summarizing from the Home page!**
+### Option 1: Download a Release (Recommended)
 
-**Build it yourself:**
+1. Download a prebuilt installer from [Releases](https://github.com/veroxsity/Squailor/releases)
+2. Install and launch Squailor
+3. Get an [OpenRouter API key](https://openrouter.ai/keys) (free tier available)
+4. Go to **Settings → General → paste your API key → Validate & save key**
+5. *(Optional)* In **Settings → Image Settings**, adjust "Max Images per Document" (0–10, default 3) to control OCR usage and cost
+6. Return to **Home**, drop your files, configure summary options (Length/Style/Tone), and click **Generate**!
+
+### Option 2: Build from Source
 
 ```powershell
-# Clone and install
+# Clone the repository
 git clone https://github.com/veroxsity/Squailor.git
 cd Squailor
+
+# Install dependencies
 npm install
 
-# Run in dev
+# Run in development
 npm run start
-# Windows (alternate): npm run dev
+# (On Windows, you can also use: npm run dev)
 
-# Build installers
-npm run build       # default platform
-npm run build:win   # Windows
-npm run build:mac   # macOS
-npm run build:linux # Linux
+# Build installers for distribution
+npm run build          # Build for your current platform
+npm run build:win      # Windows (NSIS + ZIP)
+npm run build:mac      # macOS (DMG + ZIP)
+npm run build:linux    # Linux (AppImage + DEB)
 ```
 
-> For best PDF thumbnail OCR, install canvas: 
-pm install canvas  
-> On macOS/Linux, use 
-pm run start for development. The dev script is Windows-specific.
+> **Note:** For best PDF thumbnail OCR, install canvas: `npm install canvas`  
+> On macOS/Linux, use `npm run start` for development. The `dev` script is Windows-specific.
 
 ---
 
-## 🚀 Usage
+## 🚀 How to Use Squailor
 
-1. Click "Choose Files" (PDF, PPTX, DOCX). Optionally toggle "Combine into one summary".
-2. Pick Summary Type (short/normal/longer), Style (teaching/notes), and Tone (casual/formal/informative/easy).
-3. Choose an AI model. Defaults to openai/gpt-4o-mini (vision-capable via OpenRouter).
-4. Click Generate. Watch per-file progress cards and streaming text.
-5. Open the result, copy it, or export as Markdown/Text. Everything is saved in History.
-6. Open a summary to chat with it: ask follow-ups in the Q&A panel.
+1. **Select files:** Click "📁 Browse files" or drag & drop PDFs, PPTX, or DOCX onto the upload zone
+2. **Configure summary options:**
+   - **Length:** Short, Normal, or Longer
+   - **Tone:** Casual, Formal, Informative, or Easy
+   - **Format:** Teaching (paragraphs) or Notes (bullets)
+   - **AI Model:** Choose from OpenAI, Anthropic Claude, Google Gemini, Meta Llama, and more (defaults to GPT-4o Mini)
+   - **Image analysis:** Toggle "Analyze images (OCR)" on/off
+   - **Combined mode:** Enable "Combine files" to merge up to 3 documents into one summary
+3. **Click Generate:** Watch real-time progress with stage-by-stage status (duplicate check → extract → combine → summarize → save)
+4. **Review results:** Open any summary to read, chat with Q&A, copy, or export as Markdown/TXT
+5. **Browse history:** Visit the History page to search, filter, and revisit all past summaries
 
-**Tips:**
+### Tips
 
-- For vision: pick a model with image support (e.g., 4o, 4o-mini, Gemini/Haiku variants that support images).
-- Control cost: lower the "Max Images per Document" setting (0–10). Fewer images = fewer tokens.
-- Combined mode is capped to 3 files to keep results focused and costs predictable.
+- **For vision features:** Select a model that supports images (e.g., GPT-4o, GPT-4o Mini, Claude 3.5 Sonnet, Gemini 1.5 Pro)
+- **Control costs:** Lower "Max Images per Document" in Settings → Image Settings (fewer images = fewer tokens)
+- **Combined mode best for:** Multi-part lectures, related research papers, or documents that should be cross-referenced
+- **Longer summaries:** Use the "Longer" length option for detailed explanations — the AI will preserve more content and detail
 
 ---
 
 ## ⚙️ Settings
 
-**Theme**
-- Light or Dark. Applies instantly.
+Squailor provides extensive configuration options via the Settings page:
 
-**AI Model**
-- Choose from OpenRouter models (OpenAI, Anthropic, Google, Meta, etc.). Vision models unlock OCR features.
+### 🔑 General (API Configuration)
+- **OpenRouter API Key:** Your key is encrypted at rest (AES-256) and stored in `keystore.enc`
+- **Validate & save:** Squailor tests the key before saving
 
-**Image Settings**
-- Max Images per Document: 0–10 (defaults to 3). Lower this to accelerate runs and reduce API spend.
+### 🤖 AI Models
+- Choose from **OpenAI** (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo)
+- **Anthropic** (Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku)
+- **Google** (Gemini 1.5 Pro, Gemini 1.5 Flash)
+- **Meta** (Llama 3.1 70B, Llama 3.1 8B)
+- **Others:** Mistral Large, Perplexity Sonar, and more via OpenRouter
+- Vision-capable models unlock OCR features automatically
 
-**Storage Location**
-- Switch between OS AppData and a local app folder. The app will move existing files safely.
+### 🖼️ Image Settings
+- **Max Images per Document:** 0–10 (default: 3) — controls how many images are extracted and sent for OCR/vision analysis
+- **Max Files to Combine:** 1–10 (default: 3) — caps the number of documents processed in combined mode
 
-**Portable Mode**
-- Choose "Local app folder" in Storage to keep all data next to the executable (portable usage).
+### 🎨 Appearance
+- **Theme:** Light or Dark — applies instantly across the entire app
 
-**API Key**
-- Save & validate securely. Keys are encrypted at rest; you can delete them anytime.
+### 💾 Storage Location
+- **AppData (default):** Stores data in your OS user directory
+  - Windows: `%APPDATA%/Squailor/data`
+  - macOS: `~/Library/Application Support/Squailor/data`
+  - Linux: `~/.config/Squailor/data`
+- **Application folder (portable):** Stores data in the same directory as the executable — ideal for USB drives
 
-**App Version**
-- The Settings page shows the current app version, pulled from the runtime (helpful for support and reports).
+### ⬆️ Updates
+- **Check for updates:** Manually trigger an update check
+- **Auto-updates:** Windows installer supports automatic restart-and-install; other platforms can download new releases from GitHub
 
-**Auto-updates**
-- Packaged builds can check for updates under Settings → Updates. On Windows, the installer will close the main window and restart to install automatically.
+### 🔒 Privacy
+- Squailor does **not collect telemetry** or send analytics
+- Your documents stay on your machine
+- Only minimal text/image excerpts are sent to OpenRouter for AI processing
 
 ---
 
-## 🔒 Storage & Privacy
+## 🔒 Storage & Data
 
-**Where files live:**
+### Where Squailor Stores Your Data
 
-- Windows: %APPDATA%/Squailor/data
-- macOS: ~/Library/Application Support/Squailor/data
-- Linux: ~/.config/Squailor/data
+By default, Squailor uses your OS-specific application data folder. You can switch to portable mode in Settings → Storage.
 
-**Inside data/:**
+**Default paths:**
+- Windows: `%APPDATA%\Squailor\data`
+- macOS: `~/Library/Application Support/Squailor/data`
+- Linux: `~/.config/Squailor/data`
 
-- documents/ — one folder per processed document (original file + summary.json)
-- keystore.enc — your encrypted OpenRouter API key
-- settings.json — theme, model, maxImageCount, storage location, etc.
+**Inside the `data/` folder:**
+- `documents/` — per-document folders, each named with a short UUID:
+  - `originals/` — copy of the original uploaded file
+  - `summary.json` — generated summary, metadata, preview, and settings used
+  - *(future)* `meta.json` and other versioned data
+- `keystore.enc` — your encrypted OpenRouter API key
+- `settings.json` — app settings (theme, model, image limits, storage location, etc.)
 
-**Portable mode:**
+### Portable Mode
 
-- If run in a portable directory, Squailor can keep data/ next to the executable. See Settings → Storage.
+If you select "Application folder" in Settings → Storage:
+- All data moves to a `data/` folder next to the Squailor executable
+- Perfect for running from a USB drive or keeping everything self-contained
 
-**Privacy:**
+### Duplicate Detection
 
-- Squailor does not collect telemetry. Your data stays on your machine.
-- Only the minimal text/images needed for summarization are sent to your chosen model via OpenRouter.
+Squailor uses SHA-256 content hashing to detect duplicate documents:
+- If you try to process the same file again, Squailor will find the existing summary
+- You can choose to overwrite or create a new version
 
 ---
 
 ## 🛠️ Troubleshooting
 
-- **"No text found"**
-  - Some PDFs are images only. Use a vision model and enable images; thumbnails will provide limited OCR context.
+### App won't start or crashes immediately
+- **Check logs:** Packaged builds write startup logs to:
+  - Windows: `%APPDATA%\Squailor\startup.log`
+- Confirm Node.js 18+ is installed (if building from source)
+- Try running in dev mode: `npm run dev`
 
-- **Images didn't affect the summary**
-  - Ensure the selected model supports vision. Otherwise, the app will summarize from text only.
+### "No text found" or empty summaries
+- **PDFs with images only:** Enable "Analyze images (OCR)" and select a vision-capable model (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro)
+- **Scanned documents:** May require vision models to extract text from page thumbnails
+- **Large files:** Try a smaller sample first to validate setup
 
-- **Rate limits / quota errors**
-  - These come from the model provider via OpenRouter. Try a cheaper/faster model or smaller inputs.
+### Images didn't affect the summary
+- Ensure the selected model supports vision — check the model list in Settings → AI Models
+- Non-vision models will automatically fall back to text-only processing
+- Increase "Max Images per Document" if you want more images analyzed (higher cost)
 
-- **Exports look odd**
-  - Switch to Markdown export for better formatting.
+### Rate limit or quota errors
+- These errors come from OpenRouter / your model provider
+- Try a cheaper/faster model (e.g., GPT-4o Mini, Gemini 1.5 Flash)
+- Reduce "Max Images per Document" to lower token usage
+- Split large documents into smaller chunks
 
-**Update diagnostics:**
+### Update doesn't install (Windows)
+- Check the startup log: `%APPDATA%\Squailor\startup.log`
+- The installer may require administrator privileges
+- Manually download the latest release and run the installer
+- Check that no other Squailor processes are running (Task Manager)
 
-- If an update doesn't install on Windows, check the startup log at:
-  - %APPDATA%/Squailor/startup.log (packaged builds)
-- You can also trigger updates manually in Settings → Updates.
+### Exports look odd or formatting is broken
+- Use **Markdown export** for best formatting (preserves headings, lists, emphasis)
+- TXT export is plain text only
 
 ---
 
 ## ⚠️ Known Issues
 
-- Very large PDFs (50MB+) may process slowly depending on the selected model and image settings.
-- On macOS/Linux development, use 
-pm run start (the dev script sets a Windows-style env var).
-- Some scanned PDFs may require enabling images and selecting a vision-capable model for best results.
+- **Very large PDFs (50MB+)** may process slowly depending on the model and image settings — try smaller files or disable image analysis
+- **macOS/Linux development:** Use `npm run start` (the `dev` script sets a Windows-specific environment variable)
+- **Scanned PDFs:** May require a vision-capable model and "Analyze images" enabled for best results
+- **Combined mode limit:** Capped at 3 files by default to keep prompts manageable and costs predictable (configurable in Settings → Image Settings)
 
 ---
 
 ## ❓ FAQ
 
-**Why is combined mode limited to 3 files?**
-- It keeps prompts concise and costs predictable while still capturing cross-source insights.
+**Q: Why does Squailor use OpenRouter instead of direct OpenAI/Anthropic/Google APIs?**  
+A: OpenRouter provides a unified API for multiple providers, allowing you to switch models easily without managing separate API keys. It also offers competitive pricing and access to a wider range of models.
 
-**Does Squailor read all images in a doc?**
-- It respects "Max Images per Document" and uses best-effort extraction. PPTX/DOCX images are prioritized; PDFs use page thumbnails.
+**Q: Do I need to pay for OpenRouter?**  
+A: OpenRouter offers a free tier with limited credits. For regular use, you'll need to add credits to your account. Pricing depends on the model you choose.
 
-**Which models support vision?**
-- Commonly: OpenAI 4o/4o-mini, some Anthropic/Google models via OpenRouter. If unsupported, the app will automatically fall back to text-only.
+**Q: Why is combined mode limited to 3 files?**  
+A: To keep prompts concise, costs predictable, and summaries focused. You can increase the limit in Settings → Image Settings (max 10).
+
+**Q: Does Squailor send all images in my document to the AI?**  
+A: No. Squailor respects your "Max Images per Document" setting (default: 3). For PPTX/DOCX, it prioritizes embedded images. For PDFs, it extracts page thumbnails as needed.
+
+**Q: Which models support vision/OCR?**  
+A: Commonly: OpenAI GPT-4o/4o Mini, Anthropic Claude 3.5 Sonnet, Google Gemini 1.5 Pro/Flash. If your selected model doesn't support vision, Squailor automatically falls back to text-only processing.
+
+**Q: Can I run Squailor completely offline?**  
+A: No. Squailor requires an internet connection to send requests to OpenRouter. Document parsing and storage are local, but AI summarization happens via API.
+
+**Q: Is my data private?**  
+A: Yes. Documents stay on your machine. Only the extracted text (and optionally, images) are sent to OpenRouter for AI processing. Squailor does not collect telemetry or store data in the cloud.
 
 ---
 
 ## 🗺️ Roadmap
 
-- Smarter image selection (saliency per slide)
-- Higher-quality PDF image rendering
-- More export formats (docx/pdf)
-- Per-project presets
+**Near-term priorities:**
+- Enhanced image selection (saliency detection for slides and charts)
+- Improved PDF thumbnail rendering quality
+- Additional export formats (DOCX, PDF)
+- Per-project presets and custom prompts
+- Unit and integration tests for parsers and encryption
 
-See documentation/ for deeper architecture and change notes.
+**Long-term vision:**
+- Workspace-level indexing and fuzzy search across all summaries
+- Shared team workspaces with optional cloud sync
+- Plugin system for custom parsers, exporters, and model providers
+- On-device summarization for offline use (via local LLMs)
 
-Also see: documentation/SUGGESTIONS.md for a curated list of future enhancements.
+See [`documentation/SUGGESTIONS.md`](documentation/SUGGESTIONS.md) for a curated list of future enhancements and feature ideas.
 
 ---
 
 ## 🧑‍💻 Development
 
-- **Codebase:** Electron (main/renderer/preload), vanilla HTML/CSS UI
-- **Utilities:** pdf-parse-fork, pdfjs-dist, JSZip/XML for PPTX/DOCX, OpenRouter client
-- **Storage:** folder-per-document with summary.json; encrypted keystore
-- **Updater:** electron-updater (GitHub Releases)
+### Architecture Overview
 
-For detailed docs, explore the documentation/ folder:
+- **Electron app:** Main process (`main.js`), renderer (`renderer.js`), preload bridge (`preload.js`)
+- **Parser utilities:** `utils/pdfParser.js`, `utils/pptxParser.js`, `utils/docxParser.js`, `utils/pdfImages.js`
+- **AI integration:** `utils/aiSummarizer.js` (OpenRouter client with streaming support)
+- **Security:** `utils/encryption.js` (AES-256 for API key storage), `utils/fileHash.js` (SHA-256 for duplicate detection)
+- **Storage:** Per-document folder structure under `data/documents/`, each with `summary.json` and original file
+- **Auto-updates:** `electron-updater` configured to check GitHub Releases on startup (blocking flow for packaged builds)
 
-- GETTING_STARTED.md, BUILD_INSTRUCTIONS.md, STORAGE_ARCHITECTURE.md, ENCRYPTION.md, POWERPOINT_PREVIEW_FIX.md, and more
+### Key Files
+
+- **`main.js`**: App lifecycle, IPC handlers, document processing orchestration, blocking auto-update flow, settings management
+- **`renderer.js`**: UI logic, event wiring, progress streaming, history rendering, summary viewer, Q&A chat
+- **`index.html`**: Main UI structure with multi-page workspace (Home, History, Summary View, Settings)
+- **`styles.css`**: Dark/light theme styling with CSS variables
+- **`splash.html`**: Splash screen with auto-update progress indicators
+
+### Running in Development
+
+```powershell
+npm ci              # Clean install dependencies
+npm run start       # Launch Electron app
+npm run dev         # (Windows only) Launch with NODE_ENV=development
+```
+
+### Building for Distribution
+
+```powershell
+npm run build          # Build for your current platform
+npm run build:win      # Windows (NSIS installer + portable ZIP)
+npm run build:mac      # macOS (DMG + ZIP)
+npm run build:linux    # Linux (AppImage + DEB)
+```
+
+See [`documentation/BUILD_INSTRUCTIONS.md`](documentation/BUILD_INSTRUCTIONS.md) for detailed build configuration and packaging notes.
+
+### Documentation
+
+Explore the `documentation/` folder for in-depth guides:
+- `GETTING_STARTED.md` — Onboarding for new users
+- `BUILD_INSTRUCTIONS.md` — Packaging and release workflow
+- `STORAGE_ARCHITECTURE.md` — Per-document folder structure and migration
+- `ENCRYPTION.md` — API key encryption implementation
+- `PROGRESS_VISUAL_GUIDE.md` — How multi-stage progress works
+- `POWERPOINT_PREVIEW_FIX.md` — PPTX rendering improvements
+- `CHANGELOG.md` — Version history and release notes
 
 ---
 
 ## 🧩 Support
 
-- Found a bug or have a request? [Open an issue](https://github.com/veroxsity/Squailor/issues)
-- Check the documentation index: documentation/DOCUMENTATION_INDEX.md
-- See the changelog for version history: documentation/CHANGELOG.md
+- **Found a bug?** [Open an issue](https://github.com/veroxsity/Squailor/issues)
+- **Feature request?** [Open an issue](https://github.com/veroxsity/Squailor/issues) or see [`documentation/SUGGESTIONS.md`](documentation/SUGGESTIONS.md)
+- **Documentation index:** [`documentation/DOCUMENTATION_INDEX.md`](documentation/DOCUMENTATION_INDEX.md)
+- **Changelog:** [`documentation/CHANGELOG.md`](documentation/CHANGELOG.md)
 
 ---
 
 ## 📝 Changelog
 
-See documentation/CHANGELOG.md for detailed release notes.
+See [`documentation/CHANGELOG.md`](documentation/CHANGELOG.md) for detailed version history and release notes.
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome!
+Contributions are welcome! Here's how to get started:
 
-1. Fork the repo and create a branch
-2. Make changes with clear commit messages
-3. Open a PR against main
+1. **Fork the repository** and create a feature branch
+2. **Make your changes** with clear, descriptive commit messages
+3. **Test locally** (run the app, try different file types and settings)
+4. **Open a Pull Request** against `main` with a summary of your changes
 
-Please also review the documentation/ folder for style and architecture notes.
+Please review the [`documentation/`](documentation/) folder for architecture notes and style guidelines.
 
 ---
 
 ## 📄 License
 
-ISC. See LICENSE for details.
+ISC License — see [`LICENSE`](LICENSE) for details.
