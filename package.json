@@ -49,6 +49,7 @@
   "build": {
     "appId": "com.squailor.app",
     "productName": "Squailor",
+    "asar": false,
     "directories": {
       "output": "dist"
     },
@@ -56,13 +57,6 @@
       "**/*",
       "!**/{.git,node_modules/.cache,dist}/*",
       "!*.md"
-    ],
-    "asarUnpack": [
-      "node_modules/@anthropic-ai",
-      "node_modules/@google",
-      "node_modules/cohere-ai",
-      "node_modules/web-streams-polyfill",
-      "node_modules/formdata-node"
     ],
     "win": {
       "artifactName": "${productName}-Setup-${version}.${ext}",
