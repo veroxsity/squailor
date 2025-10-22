@@ -227,7 +227,21 @@ const defaultSettings = {
   storageLocation: 'appdata',
   dataPath: defaultDataPath,
   theme: 'dark',
+  // Phase 1: multi-provider defaults
+  aiProvider: 'openrouter',
   aiModel: 'openai/gpt-4o-mini',  // Updated to OpenRouter format
+  aiConfig: {
+    'openai': {},
+    'azure-openai': { endpoint: '', deployment: '', apiVersion: '2024-08-01-preview' },
+    'anthropic': {},
+    'google': {},
+    'mistral': {},
+    'groq': {},
+    'cohere': {},
+    'xai': {},
+    'openrouter': {},
+    'custom-openai': { baseURL: '' }
+  },
   version: '1.0.0',
   // Max number of images to OCR per document (user configurable)
   maxImageCount: 3,
@@ -291,6 +305,17 @@ async function loadSettings() {
       settingsPath = path.join(dataPath, 'settings.json');
       keystorePath = path.join(dataPath, 'keystore.enc');
       
+      // Ensure required new fields exist (Phase 1 multi-provider)
+      if (!settings.aiProvider) settings.aiProvider = 'openrouter';
+      if (!settings.aiConfig || typeof settings.aiConfig !== 'object') {
+        settings.aiConfig = JSON.parse(JSON.stringify(defaultSettings.aiConfig));
+      } else {
+        const defaults = defaultSettings.aiConfig;
+        for (const key of Object.keys(defaults)) {
+          if (!(key in settings.aiConfig)) settings.aiConfig[key] = defaults[key];
+        }
+      }
+
       // Ensure storageLocation is set correctly
       settings.storageLocation = detected.location;
       settings.dataPath = detected.dataPath;
@@ -324,6 +349,73 @@ async function saveSettings(settings) {
   } catch (error) {
     console.error('Failed to save settings:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// -------------------------
+// Keystore helpers (Phase 1 multi-provider)
+// -------------------------
+
+async function ensureEncryptionLoaded() {
+  if (!validateEncryption || !encrypt || !decrypt) {
+    const enc = require('./utils/encryption');
+    encrypt = enc.encrypt;
+    decrypt = enc.decrypt;
+    validateEncryption = enc.validateEncryption;
+  }
+}
+
+// Read encrypted keystore and return a provider->secret map; migrates legacy string format.
+async function readKeystoreMap() {
+  await ensureEncryptionLoaded();
+  // Check file existence
+  try {
+    await fs.access(keystorePath);
+  } catch (_) {
+    return { map: {}, migrated: false, legacy: false };
+  }
+  try {
+    const encrypted = await fs.readFile(keystorePath, 'utf8');
+    if (!encrypted) return { map: {}, migrated: false, legacy: false };
+    const plain = decrypt(encrypted);
+    if (plain == null) return { map: {}, migrated: false, legacy: false };
+    // Try parse JSON map
+    try {
+      const parsed = JSON.parse(plain);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return { map: parsed, migrated: false, legacy: false };
+      }
+    } catch (_) {
+      // fallthrough to legacy
+    }
+    // Legacy: plain is the key string → map to openrouter
+    return { map: { openrouter: { apiKey: plain } }, migrated: true, legacy: true };
+  } catch (error) {
+    console.error('Failed to read keystore:', error && error.message);
+    return { map: {}, migrated: false, legacy: false };
+  }
+}
+
+async function writeKeystoreMap(map) {
+  await ensureEncryptionLoaded();
+  try {
+    await fs.mkdir(dataPath, { recursive: true });
+    const json = JSON.stringify(map);
+    const encStr = encrypt(json);
+    await fs.writeFile(keystorePath, encStr, 'utf8');
+    return { success: true };
+  } catch (error) {
+    console.error('Failed to write keystore:', error && error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+async function getCurrentProvider() {
+  try {
+    const s = await loadSettings();
+    return s.aiProvider || 'openrouter';
+  } catch (_) {
+    return 'openrouter';
   }
 }
 
@@ -579,6 +671,8 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
   const userSettings = await loadSettings();
   const maxImages = Number(userSettings.maxImageCount) || 3;
   const processImages = typeof processImagesFlag === 'boolean' ? processImagesFlag : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
+  const provider = (userSettings && userSettings.aiProvider) ? userSettings.aiProvider : 'openrouter';
+  const providerConfig = (userSettings && userSettings.aiConfig && userSettings.aiConfig[provider]) ? userSettings.aiConfig[provider] : {};
   // Lazy-load heavy modules to avoid increasing startup time
   if (!calculateFileHash) {
     calculateFileHash = require('./utils/fileHash').calculateFileHash;
@@ -809,42 +903,50 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
       const summary = await summarizeText(
         text,
         summaryType,
-        apiKey,
-        responseTone,
-        model,
-        summaryStyle,
-        (progress) => {
-          if (!progress) return;
-          // forward streaming deltas to renderer per-file
-          if (progress.type === 'delta') {
-            event.sender.send('processing-progress', {
-              fileName,
-              fileIndex: i + 1,
-              totalFiles,
-              status: 'Generating AI summary…',
-              stage: 'summarizing',
-              delta: progress.deltaText,
-              summarizedChars: progress.totalChars
-            });
-          } else if (progress.type === 'chunk-start' || progress.type === 'chunk-done' || progress.type === 'combine-start') {
-            event.sender.send('processing-progress', {
-              fileName,
-              fileIndex: i + 1,
-              totalFiles,
-              status: progress.type === 'chunk-start' ? `Summarizing part ${progress.chunkIndex}/${progress.totalChunks}…` : (progress.type === 'chunk-done' ? `Finished part ${progress.chunkIndex}/${progress.totalChunks}` : 'Combining parts…'),
-              stage: 'summarizing'
-            });
-          } else if (progress.type === 'done') {
-            event.sender.send('processing-progress', {
-              fileName,
-              fileIndex: i + 1,
-              totalFiles,
-              status: 'Summary generated',
-              stage: 'saving'
-            });
-          }
-        },
-        imagesToUse
+        {
+          apiKey,
+          provider,
+          model,
+          responseTone,
+          summaryStyle,
+          images: imagesToUse,
+          onProgress: (progress) => {
+            if (!progress) return;
+            // forward streaming deltas to renderer per-file
+            if (progress.type === 'delta') {
+              event.sender.send('processing-progress', {
+                fileName,
+                fileIndex: i + 1,
+                totalFiles,
+                status: 'Generating AI summary…',
+                stage: 'summarizing',
+                delta: progress.deltaText,
+                summarizedChars: progress.totalChars
+              });
+            } else if (progress.type === 'chunk-start' || progress.type === 'chunk-done' || progress.type === 'combine-start') {
+              event.sender.send('processing-progress', {
+                fileName,
+                fileIndex: i + 1,
+                totalFiles,
+                status: progress.type === 'chunk-start' ? `Summarizing part ${progress.chunkIndex}/${progress.totalChunks}…` : (progress.type === 'chunk-done' ? `Finished part ${progress.chunkIndex}/${progress.totalChunks}` : 'Combining parts…'),
+                stage: 'summarizing'
+              });
+            } else if (progress.type === 'done') {
+              event.sender.send('processing-progress', {
+                fileName,
+                fileIndex: i + 1,
+                totalFiles,
+                status: 'Summary generated',
+                stage: 'saving'
+              });
+            }
+          },
+          // pass through known provider config keys
+          baseURL: providerConfig.baseURL,
+          endpoint: providerConfig.endpoint,
+          deployment: providerConfig.deployment,
+          apiVersion: providerConfig.apiVersion
+        }
       );
       
       // Save summary
@@ -957,6 +1059,8 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
   // (settings already loaded above, but ensure we keep reference name)
   const maxImages = Number(userSettings.maxImageCount) || 3;
   const processImages = typeof processImagesFlag === 'boolean' ? processImagesFlag : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
+  const provider = (userSettings && userSettings.aiProvider) ? userSettings.aiProvider : 'openrouter';
+  const providerConfig = (userSettings && userSettings.aiConfig && userSettings.aiConfig[provider]) ? userSettings.aiConfig[provider] : {};
   // Lazy-load heavy modules
   if (!pdfParse) {
     pdfParse = require('pdf-parse-fork');
@@ -1134,49 +1238,54 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
     combinedSummary = await summarizeText(
       combinedText,
       summaryType,
-      apiKey,
-      responseTone,
-      model,
-      summaryStyle,
-      (progress) => {
-        // For combined mode, forward progress per original source (first fileIndex for visuals)
-        if (!progress) return;
-        const idx = 1;
-        if (progress.type === 'delta') {
-          extracted.forEach((info, k) => {
-            event.sender.send('processing-progress', {
-              fileName: info.fileName,
-              fileIndex: k + 1,
-              totalFiles,
-              status: 'Generating combined AI summary…',
-              stage: 'summarizing',
-              delta: progress.deltaText
+      {
+        apiKey,
+        provider,
+        model,
+        responseTone,
+        summaryStyle,
+        images: imagesToUse,
+        onProgress: (progress) => {
+          // For combined mode, forward progress per original source (first fileIndex for visuals)
+          if (!progress) return;
+          if (progress.type === 'delta') {
+            extracted.forEach((info, k) => {
+              event.sender.send('processing-progress', {
+                fileName: info.fileName,
+                fileIndex: k + 1,
+                totalFiles,
+                status: 'Generating combined AI summary…',
+                stage: 'summarizing',
+                delta: progress.deltaText
+              });
             });
-          });
-        } else if (progress.type === 'chunk-start' || progress.type === 'chunk-done' || progress.type === 'combine-start') {
-          extracted.forEach((info, k) => {
-            event.sender.send('processing-progress', {
-              fileName: info.fileName,
-              fileIndex: k + 1,
-              totalFiles,
-              status: progress.type === 'chunk-start' ? `Summarizing part ${progress.chunkIndex}/${progress.totalChunks}…` : (progress.type === 'chunk-done' ? `Finished part ${progress.chunkIndex}/${progress.totalChunks}` : 'Combining parts…'),
-              stage: 'summarizing'
+          } else if (progress.type === 'chunk-start' || progress.type === 'chunk-done' || progress.type === 'combine-start') {
+            extracted.forEach((info, k) => {
+              event.sender.send('processing-progress', {
+                fileName: info.fileName,
+                fileIndex: k + 1,
+                totalFiles,
+                status: progress.type === 'chunk-start' ? `Summarizing part ${progress.chunkIndex}/${progress.totalChunks}…` : (progress.type === 'chunk-done' ? `Finished part ${progress.chunkIndex}/${progress.totalChunks}` : 'Combining parts…'),
+                stage: 'summarizing'
+              });
             });
-          });
-        } else if (progress.type === 'done') {
-          extracted.forEach((info, k) => {
-            event.sender.send('processing-progress', {
-              fileName: info.fileName,
-              fileIndex: k + 1,
-              totalFiles,
-              status: 'Summary generated',
-              stage: 'saving'
+          } else if (progress.type === 'done') {
+            extracted.forEach((info, k) => {
+              event.sender.send('processing-progress', {
+                fileName: info.fileName,
+                fileIndex: k + 1,
+                totalFiles,
+                status: 'Summary generated',
+                stage: 'saving'
+              });
             });
-          });
-        }
-      },
-      // Provide up to 3 images if supported
-      imagesToUse
+          }
+        },
+        baseURL: providerConfig.baseURL,
+        endpoint: providerConfig.endpoint,
+        deployment: providerConfig.deployment,
+        apiVersion: providerConfig.apiVersion
+      }
     );
   } catch (error) {
     let displayMessage = error.message || 'AI summarization failed';
@@ -1274,47 +1383,62 @@ ipcMain.handle('save-summary', async (event, fileName, summary) => {
   }
 });
 
-// Validate API key
-ipcMain.handle('validate-api-key', async (event, apiKey) => {
+// Validate API key using provider adapters (backward compatible with string arg)
+ipcMain.handle('validate-api-key', async (event, arg) => {
   try {
-    const OpenAI = require('openai');
-    const openai = new OpenAI({ 
-      apiKey,
-      baseURL: 'https://openrouter.ai/api/v1'
-    });
-    // Try to list models to validate the key
-    await openai.models.list();
-    return { valid: true };
+    const { getAdapter } = require('./utils/ai/providers/registry');
+    let provider = 'openrouter';
+    let apiKey = '';
+    let config = {};
+
+    if (typeof arg === 'string') {
+      apiKey = arg;
+    } else if (arg && typeof arg === 'object') {
+      provider = arg.provider || 'openrouter';
+      apiKey = arg.apiKey || '';
+      config = arg.config || {};
+    }
+
+    // If apiKey not provided, try keystore for provider
+    if (!apiKey) {
+      const { map } = await readKeystoreMap();
+      if (map[provider] && map[provider].apiKey) {
+        apiKey = map[provider].apiKey;
+      }
+    }
+
+    if (!apiKey) {
+      return { valid: false, error: 'Missing API key for provider: ' + provider };
+    }
+
+    // Merge with settings non-secret config as fallback
+    const settings = await loadSettings();
+    const providerCfg = (settings.aiConfig && settings.aiConfig[provider]) || {};
+    const merged = { ...providerCfg, ...config, apiKey };
+
+    const adapter = getAdapter(provider);
+    if (!adapter || typeof adapter.validate !== 'function') {
+      return { valid: false, error: `Unsupported provider: ${provider}` };
+    }
+    const result = await adapter.validate(merged);
+    return result;
   } catch (error) {
     return { valid: false, error: error.message };
   }
 });
 
-// Save API key securely using encryption
+// Save API key securely for current provider (backward-compatible entry point)
 ipcMain.handle('save-api-key', async (event, apiKey) => {
   try {
-    // Lazy-load encryption helpers
-    if (!validateEncryption) {
-      const enc = require('./utils/encryption');
-      encrypt = enc.encrypt;
-      decrypt = enc.decrypt;
-      validateEncryption = enc.validateEncryption;
-    }
-
-    // Validate encryption is working
-    if (!validateEncryption()) {
+    await ensureEncryptionLoaded();
+    if (!validateEncryption() ) {
       return { success: false, error: 'Encryption validation failed' };
     }
-
-    // Encrypt the API key
-    const encryptedKey = encrypt(apiKey);
-    
-    // Ensure data directory exists
-    await fs.mkdir(dataPath, { recursive: true });
-    
-    // Save encrypted key to file
-    await fs.writeFile(keystorePath, encryptedKey, 'utf8');
-    
+    const { map, migrated } = await readKeystoreMap();
+    const provider = await getCurrentProvider();
+    const next = { ...map, [provider]: { apiKey } };
+    const res = await writeKeystoreMap(next);
+    if (!res.success) return res;
     return { success: true };
   } catch (error) {
     console.error('Failed to save API key:', error);
@@ -1322,33 +1446,12 @@ ipcMain.handle('save-api-key', async (event, apiKey) => {
   }
 });
 
-// Load API key securely using encryption
+// Load API key for current provider
 ipcMain.handle('load-api-key', async () => {
   try {
-    // Check if keystore file exists
-    try {
-      await fs.access(keystorePath);
-    } catch {
-      // File doesn't exist, return empty
-      return { success: true, apiKey: '' };
-    }
-    
-    // Read encrypted key from file
-    const encryptedKey = await fs.readFile(keystorePath, 'utf8');
-    
-    if (!encryptedKey) {
-      return { success: true, apiKey: '' };
-    }
-    
-    // Decrypt the API key
-    if (!decrypt) {
-      const enc = require('./utils/encryption');
-      encrypt = enc.encrypt;
-      decrypt = enc.decrypt;
-      validateEncryption = enc.validateEncryption;
-    }
-    const apiKey = decrypt(encryptedKey);
-    
+    const provider = await getCurrentProvider();
+    const { map } = await readKeystoreMap();
+    const apiKey = (map[provider] && map[provider].apiKey) || '';
     return { success: true, apiKey };
   } catch (error) {
     console.error('Failed to load API key:', error);
@@ -1356,22 +1459,75 @@ ipcMain.handle('load-api-key', async () => {
   }
 });
 
-// Delete API key
+// Delete API key for current provider
 ipcMain.handle('delete-api-key', async () => {
   try {
-    // Delete keystore file
-    try {
-      await fs.unlink(keystorePath);
-    } catch (error) {
-      // File might not exist, which is fine
-      if (error.code !== 'ENOENT') {
-        throw error;
-      }
+    const provider = await getCurrentProvider();
+    const { map } = await readKeystoreMap();
+    if (map[provider]) delete map[provider];
+    // If empty, remove file; else rewrite
+    const keys = Object.keys(map);
+    if (keys.length === 0) {
+      try { await fs.unlink(keystorePath); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    } else {
+      const res = await writeKeystoreMap(map);
+      if (!res.success) return res;
     }
-    
     return { success: true };
   } catch (error) {
     console.error('Failed to delete API key:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// New Phase 1 IPC: provider-specific credentials save/load/delete
+ipcMain.handle('save-provider-credentials', async (event, { provider, apiKey, config }) => {
+  try {
+    if (!provider) return { success: false, error: 'Missing provider' };
+    await ensureEncryptionLoaded();
+    if (!validateEncryption()) return { success: false, error: 'Encryption validation failed' };
+    const { map } = await readKeystoreMap();
+    if (apiKey) map[provider] = { apiKey };
+    const res = await writeKeystoreMap(map);
+    if (!res.success) return res;
+    // Persist non-secret config to settings
+    const settings = await loadSettings();
+    settings.aiConfig = settings.aiConfig || {};
+    settings.aiConfig[provider] = { ...(settings.aiConfig[provider] || {}), ...(config || {}) };
+    await saveSettings(settings);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('load-provider-credentials', async (event, provider) => {
+  try {
+    if (!provider) provider = await getCurrentProvider();
+    const { map } = await readKeystoreMap();
+    const hasKey = !!(map[provider] && map[provider].apiKey);
+    const settings = await loadSettings();
+    const config = (settings.aiConfig && settings.aiConfig[provider]) || {};
+    return { success: true, hasKey, config };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-provider-credentials', async (event, provider) => {
+  try {
+    if (!provider) provider = await getCurrentProvider();
+    const { map } = await readKeystoreMap();
+    if (map[provider]) delete map[provider];
+    const keys = Object.keys(map);
+    if (keys.length === 0) {
+      try { await fs.unlink(keystorePath); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    } else {
+      const res = await writeKeystoreMap(map);
+      if (!res.success) return res;
+    }
+    return { success: true };
+  } catch (error) {
     return { success: false, error: error.message };
   }
 });
@@ -1916,11 +2072,27 @@ ipcMain.handle('qa-summary', async (event, { folderId, question, apiKey, model }
       return { success: false, error: 'Summary not found for this item.' };
     }
 
+    // Resolve provider from settings
+    const settings = await loadSettings();
+    const provider = (settings && settings.aiProvider) ? settings.aiProvider : 'openrouter';
+    const providerConfig = (settings && settings.aiConfig && settings.aiConfig[provider]) ? settings.aiConfig[provider] : {};
+
     // Provide light streaming feedback back to renderer via a channel
     const channel = `qa-progress:${folderId}`;
-    const answer = await answerQuestionAboutSummary(summary, question, apiKey, model, (progress) => {
-      try { safeSend(mainWindow, channel, progress); } catch (_) {}
-    });
+    const answer = await answerQuestionAboutSummary(
+      summary,
+      question,
+      {
+        apiKey,
+        provider,
+        model,
+        onProgress: (progress) => { try { safeSend(mainWindow, channel, progress); } catch (_) {} },
+        baseURL: providerConfig.baseURL,
+        endpoint: providerConfig.endpoint,
+        deployment: providerConfig.deployment,
+        apiVersion: providerConfig.apiVersion
+      }
+    );
 
     return { success: true, answer };
   } catch (error) {
@@ -1930,5 +2102,85 @@ ipcMain.handle('qa-summary', async (event, { folderId, question, apiKey, model }
     else if (error.message && error.message.startsWith('QUOTA_EXCEEDED:')) { errorType = 'quota'; displayMessage = error.message.replace('QUOTA_EXCEEDED: ', ''); }
     else if (error.message && error.message.startsWith('INVALID_API_KEY:')) { errorType = 'api-key'; displayMessage = error.message.replace('INVALID_API_KEY: ', ''); }
     return { success: false, error: displayMessage, errorType };
+  }
+});
+
+// Get available models for a provider
+ipcMain.handle('get-provider-models', async (event, provider) => {
+  try {
+    if (!provider) provider = 'openrouter';
+    
+    // Define model lists per provider
+    const providerModels = {
+      'openrouter': [
+        { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini (Recommended)', group: 'OpenAI' },
+        { value: 'openai/gpt-4o', label: 'GPT-4o', group: 'OpenAI' },
+        { value: 'openai/gpt-4-turbo', label: 'GPT-4 Turbo', group: 'OpenAI' },
+        { value: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 Turbo', group: 'OpenAI' },
+        { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet', group: 'Anthropic' },
+        { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus', group: 'Anthropic' },
+        { value: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku', group: 'Anthropic' },
+        { value: 'google/gemini-pro-1.5', label: 'Gemini 1.5 Pro', group: 'Google' },
+        { value: 'google/gemini-flash-1.5', label: 'Gemini 1.5 Flash', group: 'Google' },
+        { value: 'meta-llama/llama-3.1-70b-instruct', label: 'Llama 3.1 70B', group: 'Meta' },
+        { value: 'meta-llama/llama-3.1-8b-instruct', label: 'Llama 3.1 8B', group: 'Meta' },
+        { value: 'mistralai/mistral-large', label: 'Mistral Large', group: 'Other' },
+        { value: 'perplexity/llama-3.1-sonar-large-128k-online', label: 'Perplexity Sonar', group: 'Other' }
+      ],
+      'openai': [
+        { value: 'gpt-4o', label: 'GPT-4o', group: 'GPT-4' },
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Recommended)', group: 'GPT-4' },
+        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', group: 'GPT-4' },
+        { value: 'gpt-4', label: 'GPT-4', group: 'GPT-4' },
+        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', group: 'GPT-3.5' }
+      ],
+      'anthropic': [
+        { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Latest)', group: 'Claude 3.5' },
+        { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus', group: 'Claude 3' },
+        { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet', group: 'Claude 3' },
+        { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', group: 'Claude 3' }
+      ],
+      'google': [
+        { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro (Latest)', group: 'Gemini 1.5' },
+        { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash (Latest)', group: 'Gemini 1.5' },
+        { value: 'gemini-pro', label: 'Gemini Pro', group: 'Gemini 1.0' }
+      ],
+      'cohere': [
+        { value: 'command-r-plus', label: 'Command R+', group: 'Command' },
+        { value: 'command-r', label: 'Command R', group: 'Command' },
+        { value: 'command', label: 'Command', group: 'Command' },
+        { value: 'command-light', label: 'Command Light', group: 'Command' }
+      ],
+      'groq': [
+        { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile', group: 'Llama 3.3' },
+        { value: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B Versatile', group: 'Llama 3.1' },
+        { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant', group: 'Llama 3.1' },
+        { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', group: 'Mixtral' }
+      ],
+      'mistral': [
+        { value: 'mistral-large-latest', label: 'Mistral Large (Latest)', group: 'Mistral' },
+        { value: 'mistral-medium-latest', label: 'Mistral Medium', group: 'Mistral' },
+        { value: 'mistral-small-latest', label: 'Mistral Small', group: 'Mistral' }
+      ],
+      'xai': [
+        { value: 'grok-beta', label: 'Grok Beta', group: 'Grok' }
+      ],
+      'azure-openai': [
+        { value: 'gpt-4o', label: 'GPT-4o', group: 'GPT-4' },
+        { value: 'gpt-4o-mini', label: 'GPT-4o Mini', group: 'GPT-4' },
+        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', group: 'GPT-4' },
+        { value: 'gpt-4', label: 'GPT-4', group: 'GPT-4' },
+        { value: 'gpt-35-turbo', label: 'GPT-3.5 Turbo', group: 'GPT-3.5' }
+      ],
+      'custom-openai': [
+        { value: 'gpt-4', label: 'GPT-4 (or equivalent)', group: 'Compatible' },
+        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (or equivalent)', group: 'Compatible' }
+      ]
+    };
+
+    const models = providerModels[provider] || [];
+    return { success: true, models };
+  } catch (error) {
+    return { success: false, error: error.message, models: [] };
   }
 });

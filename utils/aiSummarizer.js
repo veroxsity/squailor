@@ -1,4 +1,5 @@
-const OpenAI = require('openai');
+const { getAdapter } = require('./ai/providers/registry');
+const { supportsVision: adapterSupportsVision } = require('./ai/providers/capabilities');
 
 /**
  * Summarize text (and optionally images) using OpenRouter API
@@ -13,16 +14,31 @@ const OpenAI = require('openai');
  * @returns {Promise<string>} - Summary text
  */
 // onProgress: optional callback({ type: 'delta'|'chunk-start'|'chunk-done'|'combine-start'|'done', deltaText?, totalChars? , chunkIndex?, totalChunks? })
-async function summarizeText(text, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', onProgress = null, images = []) {
-  // Configure OpenAI SDK to use OpenRouter
-  const openai = new OpenAI({
-    apiKey: apiKey,
-    baseURL: 'https://openrouter.ai/api/v1',
-    defaultHeaders: {
-      'HTTP-Referer': 'https://github.com/yourusername/squailor', // Optional: Replace with your app URL
-      'X-Title': 'Squailor Document Summarizer', // Optional: App name
-    }
-  });
+// New primary signature: summarizeText(text, summaryType, options)
+// Backward-compatible with previous positional args.
+async function summarizeText(text, summaryType, arg3, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', onProgress = null, images = []) {
+  // Normalize arguments to an options object
+  let opts;
+  if (typeof arg3 === 'object' && arg3 !== null && (arg3.apiKey || arg3.provider || arg3.model || arg3.responseTone || arg3.summaryStyle)) {
+    opts = arg3;
+  } else {
+    // Legacy positional signature
+    opts = { apiKey: arg3, responseTone, model, summaryStyle, onProgress, images };
+  }
+  const provider = opts.provider || 'openrouter';
+  const apiKey = opts.apiKey || '';
+  model = opts.model || model;
+  responseTone = opts.responseTone || responseTone;
+  summaryStyle = opts.summaryStyle || summaryStyle;
+  onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : onProgress;
+  images = Array.isArray(opts.images) ? opts.images : images;
+
+  // Resolve adapter client
+  const adapter = getAdapter(provider);
+  if (!adapter) {
+    throw new Error(`AI summarization failed: Unsupported provider '${provider}'`);
+  }
+  const client = adapter.createClient({ apiKey, baseURL: opts.baseURL, endpoint: opts.endpoint, deployment: opts.deployment, apiVersion: opts.apiVersion });
 
   // Tone-specific adjustments
   const toneInstructions = {
@@ -276,47 +292,36 @@ ${text}`;
       }
       
       // Try streaming for live feedback; fallback to non-streaming if not supported
+      // If images are provided, prefer a vision-capable model prompt format (multi-part content)
+      const userMessage = buildUserMessage(userPrompt, images);
       let full = '';
       try {
-        // If images are provided, prefer a vision-capable model prompt format (multi-part content)
-        const userMessage = buildUserMessage(userPrompt, images);
-        const stream = await openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            userMessage
-          ],
+        const out = await adapter.chat({
+          client,
+          model,
+          messages: [ { role: 'system', content: systemPrompt }, userMessage ],
           temperature: 0.3,
-          max_tokens: maxTokens,
-          stream: true
-        });
-
-        for await (const part of stream) {
-          const delta = part?.choices?.[0]?.delta?.content || '';
-          if (delta) {
+          maxTokens,
+          stream: true,
+          onDelta: (delta) => {
             full += delta;
-            if (typeof onProgress === 'function') {
-              onProgress({ type: 'delta', deltaText: delta, totalChars: full.length });
-            }
+            if (typeof onProgress === 'function') onProgress({ type: 'delta', deltaText: delta, totalChars: full.length });
           }
-        }
-        if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: full.length });
-        return full.trim();
-      } catch (e) {
-        // Fallback to non-streaming
-        const userMessage = buildUserMessage(userPrompt, images);
-        const response = await openai.chat.completions.create({
-          model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            userMessage
-          ],
-          temperature: 0.3,
-          max_tokens: maxTokens
         });
-        full = response.choices[0].message.content.trim();
-        if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: full.length });
-        return full;
+        if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: out.length });
+        return out;
+      } catch (_) {
+        // Fallback to non-streaming using same adapter
+        const out = await adapter.chat({
+          client,
+          model,
+          messages: [ { role: 'system', content: systemPrompt }, userMessage ],
+          temperature: 0.3,
+          maxTokens,
+          stream: false
+        });
+        if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: out.length });
+        return out;
       }
     } else {
       // Multiple chunks - summarize each and then combine
@@ -341,34 +346,29 @@ ${chunks[i]}`;
         // Attempt streaming for each chunk too (shorter feedback bursts)
         let chunkFull = '';
         try {
-          const stream = await openai.chat.completions.create({
-              model: model,
-              messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: chunkPrompt }
-              ],
-              temperature: 0.3,
-              max_tokens: chunkMaxTokens,
-              stream: true
-            });
-          for await (const part of stream) {
-            const delta = part?.choices?.[0]?.delta?.content || '';
-            if (delta) {
+          const out = await adapter.chat({
+            client,
+            model,
+            messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: chunkPrompt } ],
+            temperature: 0.3,
+            maxTokens: chunkMaxTokens,
+            stream: true,
+            onDelta: (delta) => {
               chunkFull += delta;
               if (typeof onProgress === 'function') onProgress({ type: 'delta', deltaText: delta, totalChars: chunkFull.length, chunkIndex: i + 1, totalChunks: chunks.length });
             }
-          }
-        } catch (e) {
-          const response = await openai.chat.completions.create({
-            model: model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: chunkPrompt }
-            ],
-            temperature: 0.3,
-            max_tokens: chunkMaxTokens
           });
-          chunkFull = response.choices[0].message.content.trim();
+          chunkFull = out;
+        } catch (e) {
+          const out = await adapter.chat({
+            client,
+            model,
+            messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: chunkPrompt } ],
+            temperature: 0.3,
+            maxTokens: chunkMaxTokens,
+            stream: false
+          });
+          chunkFull = out;
         }
 
         if (typeof onProgress === 'function') onProgress({ type: 'chunk-done', chunkIndex: i + 1, totalChunks: chunks.length });
@@ -397,37 +397,29 @@ ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
         if (typeof onProgress === 'function') onProgress({ type: 'combine-start' });
         let final = '';
         try {
-          // Prefer streaming during the final merge so the UI shows progress
-          const stream = await openai.chat.completions.create({
-            model: model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: combinedPrompt }
-            ],
+          const out = await adapter.chat({
+            client,
+            model,
+            messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: combinedPrompt } ],
             temperature: 0.3,
-            max_tokens: finalMaxTokens,
-            stream: true
-          });
-
-          for await (const part of stream) {
-            const delta = part?.choices?.[0]?.delta?.content || '';
-            if (delta) {
+            maxTokens: finalMaxTokens,
+            stream: true,
+            onDelta: (delta) => {
               final += delta;
               if (typeof onProgress === 'function') onProgress({ type: 'delta', deltaText: delta, totalChars: final.length });
             }
-          }
-        } catch (e) {
-          // Fallback to non-streaming if provider/model doesn't support streaming
-          const finalResponse = await openai.chat.completions.create({
-            model: model,
-            messages: [
-              { role: 'system', content: systemPrompt },
-              { role: 'user', content: combinedPrompt }
-            ],
-            temperature: 0.3,
-            max_tokens: finalMaxTokens
           });
-          final = (finalResponse.choices?.[0]?.message?.content || '').trim();
+          final = out;
+        } catch (e) {
+          const out = await adapter.chat({
+            client,
+            model,
+            messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: combinedPrompt } ],
+            temperature: 0.3,
+            maxTokens: finalMaxTokens,
+            stream: false
+          });
+          final = out;
         }
         if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: final.length });
         return final.trim();
@@ -438,26 +430,12 @@ ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
       return only;
     }
   } catch (error) {
-    // Check if it's a rate limit error
-    if (error.message && error.message.includes('Rate limit')) {
-      // Extract wait time from error message
-      const waitTimeMatch = error.message.match(/Please try again in ([^.]+)/);
-      const waitTime = waitTimeMatch ? waitTimeMatch[1] : 'some time';
-      
-      throw new Error(`RATE_LIMIT: You've hit your OpenAI API rate limit. Please wait ${waitTime} before trying again. You can check your usage at https://platform.openai.com/account/usage`);
+    // Adapters already normalize errors with prefixes; preserve legacy mapping when possible
+    const msg = error && error.message ? error.message : String(error);
+    if (/^RATE_LIMIT:/.test(msg) || /^QUOTA_EXCEEDED:/.test(msg) || /^INVALID_API_KEY:/.test(msg)) {
+      throw new Error(msg);
     }
-    
-    // Check for other common OpenAI errors
-    if (error.message && error.message.includes('insufficient_quota')) {
-      throw new Error('QUOTA_EXCEEDED: Your OpenAI account has insufficient credits. Please add credits at https://platform.openai.com/account/billing');
-    }
-    
-    if (error.message && error.message.includes('invalid_api_key')) {
-      throw new Error('INVALID_API_KEY: Your API key is invalid or has been revoked. Please check your API key in Settings.');
-    }
-    
-    // Generic error
-    throw new Error(`AI summarization failed: ${error.message}`);
+    throw new Error(`AI summarization failed: ${msg}`);
   }
 }
 
@@ -545,20 +523,7 @@ function buildUserMessage(userPrompt, images) {
  * You can expand/override this list via settings later.
  */
 function modelSupportsVision(model) {
-  if (!model || typeof model !== 'string') return false;
-  const m = model.toLowerCase();
-  return (
-    // OpenAI/Orgs id forms
-    m.includes('gpt-4o') || m.includes('gpt4o') ||
-    // Common shorthand variants users type
-    m.includes('4o') || m.includes('4-0') ||
-    // General vision-capable model markers
-    m.includes('omni') || m.includes('vision') ||
-    // Anthropic
-    m.includes('claude-3.5-sonnet') ||
-    // OSS vision models
-    m.includes('llava')
-  );
+  return adapterSupportsVision(model);
 }
 
 module.exports.modelSupportsVision = modelSupportsVision;
@@ -573,15 +538,21 @@ module.exports.modelSupportsVision = modelSupportsVision;
  * @param {function|null} onProgress - optional streaming callback
  * @returns {Promise<string>} - The model's answer
  */
-async function answerQuestionAboutSummary(summary, question, apiKey, model = 'openai/gpt-4o-mini', onProgress = null) {
-  const openai = new OpenAI({
-    apiKey,
-    baseURL: 'https://openrouter.ai/api/v1',
-    defaultHeaders: {
-      'HTTP-Referer': 'https://github.com/yourusername/squailor',
-      'X-Title': 'Squailor Document Summarizer'
-    }
-  });
+// New signature supports options object with provider
+async function answerQuestionAboutSummary(summary, question, apiKeyOrOptions, model = 'openai/gpt-4o-mini', onProgress = null) {
+  let provider = 'openrouter';
+  let apiKey = apiKeyOrOptions;
+  let opts = {};
+  if (typeof apiKeyOrOptions === 'object' && apiKeyOrOptions !== null) {
+    opts = apiKeyOrOptions;
+    apiKey = opts.apiKey || '';
+    provider = opts.provider || 'openrouter';
+    model = opts.model || model;
+    onProgress = typeof opts.onProgress === 'function' ? opts.onProgress : onProgress;
+  }
+  const adapter = getAdapter(provider);
+  if (!adapter) throw new Error(`AI Q&A failed: Unsupported provider '${provider}'`);
+  const client = adapter.createClient({ apiKey, baseURL: opts.baseURL, endpoint: opts.endpoint, deployment: opts.deployment, apiVersion: opts.apiVersion });
 
   const systemPrompt = `You are a helpful study assistant.
 You will be given a SUMMARY of a document and a USER QUESTION.
@@ -595,51 +566,37 @@ If the summary does not contain enough information to answer, reply: "I don't ha
     // Try streaming first
     let full = '';
     try {
-      const stream = await openai.chat.completions.create({
+      const out = await adapter.chat({
+        client,
         model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
+        messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt } ],
         temperature: 0.2,
-        max_tokens: 800,
-        stream: true
-      });
-      for await (const part of stream) {
-        const delta = part?.choices?.[0]?.delta?.content || '';
-        if (delta) {
+        maxTokens: 800,
+        stream: true,
+        onDelta: (delta) => {
           full += delta;
           if (typeof onProgress === 'function') onProgress({ type: 'delta', deltaText: delta, totalChars: full.length });
         }
-      }
-      if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: full.length });
-      return full.trim();
-    } catch (e) {
-      const resp = await openai.chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt }
-        ],
-        temperature: 0.2,
-        max_tokens: 800
       });
-      return (resp.choices?.[0]?.message?.content || '').trim();
+      if (typeof onProgress === 'function') onProgress({ type: 'done', totalChars: out.length });
+      return out.trim();
+    } catch (e) {
+      const out = await adapter.chat({
+        client,
+        model,
+        messages: [ { role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt } ],
+        temperature: 0.2,
+        maxTokens: 800,
+        stream: false
+      });
+      return out.trim();
     }
   } catch (error) {
-    // Mirror summarizeText error normalization
-    if (error.message && error.message.includes('Rate limit')) {
-      const waitTimeMatch = error.message.match(/Please try again in ([^.]+)/);
-      const waitTime = waitTimeMatch ? waitTimeMatch[1] : 'some time';
-      throw new Error(`RATE_LIMIT: You've hit your OpenAI API rate limit. Please wait ${waitTime} before trying again.`);
+    const msg = error && error.message ? error.message : String(error);
+    if (/^RATE_LIMIT:/.test(msg) || /^QUOTA_EXCEEDED:/.test(msg) || /^INVALID_API_KEY:/.test(msg)) {
+      throw new Error(msg);
     }
-    if (error.message && error.message.includes('insufficient_quota')) {
-      throw new Error('QUOTA_EXCEEDED: Your OpenAI account has insufficient credits.');
-    }
-    if (error.message && error.message.includes('invalid_api_key')) {
-      throw new Error('INVALID_API_KEY: Your API key is invalid or has been revoked.');
-    }
-    throw new Error(`AI Q&A failed: ${error.message}`);
+    throw new Error(`AI Q&A failed: ${msg}`);
   }
 }
 

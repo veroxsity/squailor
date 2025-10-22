@@ -10,12 +10,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('save-summary', fileName, summary),
   validateApiKey: (apiKey) => 
     ipcRenderer.invoke('validate-api-key', apiKey),
+  // Provider-aware validation: { provider, apiKey?, config? }
+  validateApiKeyForProvider: (args) =>
+    ipcRenderer.invoke('validate-api-key', args),
   saveApiKey: (apiKey) =>
     ipcRenderer.invoke('save-api-key', apiKey),
   loadApiKey: () =>
     ipcRenderer.invoke('load-api-key'),
   deleteApiKey: () =>
     ipcRenderer.invoke('delete-api-key'),
+  // Provider-aware credentials management
+  saveProviderCredentials: (provider, apiKey, config) =>
+    ipcRenderer.invoke('save-provider-credentials', { provider, apiKey, config }),
+  loadProviderCredentials: (provider) =>
+    ipcRenderer.invoke('load-provider-credentials', provider),
+  deleteProviderCredentials: (provider) =>
+    ipcRenderer.invoke('delete-provider-credentials', provider),
   readStoredFile: (storedFileName) =>
     ipcRenderer.invoke('read-stored-file', storedFileName),
   checkFileExists: (storedFileName) =>
@@ -57,5 +67,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   // Q&A about a summary
   askSummaryQuestion: (folderId, question, apiKey, model) => ipcRenderer.invoke('qa-summary', { folderId, question, apiKey, model }),
-  onQaProgress: (folderId, callback) => ipcRenderer.on(`qa-progress:${folderId}`, (event, data) => callback(data))
+  onQaProgress: (folderId, callback) => ipcRenderer.on(`qa-progress:${folderId}`, (event, data) => callback(data)),
+  // Get models for a provider
+  getProviderModels: (provider) => ipcRenderer.invoke('get-provider-models', provider)
 });

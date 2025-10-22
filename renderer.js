@@ -3,13 +3,10 @@ let apiKey = '';
 let currentTheme = localStorage.getItem('app_theme') || 'dark';
 let selectedModel = localStorage.getItem('ai_model') || 'openai/gpt-4o-mini';  // Updated default
 let summaryHistory = [];
+let currentProvider = 'openrouter';
 const SUMMARY_PREVIEW_LIMIT = 600;
 
-// DOM Elements
-const apiKeyInput = document.getElementById('apiKey');
-const toggleApiKeyBtn = document.getElementById('toggleApiKey');
-const saveApiKeyBtn = document.getElementById('saveApiKey');
-const apiKeyStatus = document.getElementById('apiKeyStatus');
+// DOM Elements (removed legacy apiKey elements)
 const selectFilesBtn = document.getElementById('selectFiles');
 const processFilesBtn = document.getElementById('processFiles');
 let processCombined = false; // user choice: combined vs individual
@@ -75,6 +72,84 @@ const combinedHelperLabel = document.getElementById('combinedHelperLabel');
 const processImagesToggle = document.getElementById('processImagesToggle');
 let processImages = true;
 
+// Provider display names
+const providerDisplayNames = {
+  'openrouter': 'OpenRouter',
+  'openai': 'OpenAI',
+  'anthropic': 'Anthropic',
+  'google': 'Google',
+  'cohere': 'Cohere',
+  'groq': 'Groq',
+  'mistral': 'Mistral',
+  'xai': 'xAI',
+  'azure-openai': 'Azure OpenAI',
+  'custom-openai': 'Custom OpenAI'
+};
+
+// Populate model select based on provider
+async function populateModels(provider, hasApiKey) {
+  const modelSelect = document.getElementById('modelSelect');
+  const currentProviderLabel = document.getElementById('currentProviderLabel');
+  
+  if (!modelSelect) return;
+  
+  // Update provider label
+  if (currentProviderLabel) {
+    const displayName = providerDisplayNames[provider] || provider;
+    currentProviderLabel.textContent = `Current provider: ${displayName}`;
+  }
+  
+  // If no API key, show message
+  if (!hasApiKey) {
+    modelSelect.innerHTML = '<option value="">No API key set - go to Settings</option>';
+    modelSelect.disabled = true;
+    return;
+  }
+  
+  // Get models from backend
+  try {
+    const result = await window.electronAPI.getProviderModels(provider);
+    if (result.success && result.models && result.models.length > 0) {
+      // Build optgroups
+      const groups = {};
+      result.models.forEach(model => {
+        if (!groups[model.group]) {
+          groups[model.group] = [];
+        }
+        groups[model.group].push(model);
+      });
+      
+      let html = '';
+      Object.keys(groups).forEach(groupName => {
+        html += `<optgroup label="${groupName}">`;
+        groups[groupName].forEach(model => {
+          html += `<option value="${model.value}">${model.label}</option>`;
+        });
+        html += '</optgroup>';
+      });
+      
+      modelSelect.innerHTML = html;
+      modelSelect.disabled = false;
+      
+      // Restore selected model if it exists
+      if (selectedModel && Array.from(modelSelect.options).some(opt => opt.value === selectedModel)) {
+        modelSelect.value = selectedModel;
+      } else {
+        // Default to first option
+        modelSelect.selectedIndex = 0;
+        selectedModel = modelSelect.value;
+      }
+    } else {
+      modelSelect.innerHTML = '<option value="">No models available</option>';
+      modelSelect.disabled = true;
+    }
+  } catch (error) {
+    console.error('Failed to load models:', error);
+    modelSelect.innerHTML = '<option value="">Error loading models</option>';
+    modelSelect.disabled = true;
+  }
+}
+
 function updateQueueStats() {
   if (queueCountEl) {
     queueCountEl.textContent = selectedFiles.length;
@@ -86,13 +161,10 @@ function updateQueueStats() {
 
 // Initialize on load
 document.addEventListener('DOMContentLoaded', async () => {
-  // Load API key from secure storage
+  // Load API key from secure storage (for current provider)
   const keyResult = await window.electronAPI.loadApiKey();
   if (keyResult.success && keyResult.apiKey) {
     apiKey = keyResult.apiKey;
-    if (apiKeyInput) {
-      apiKeyInput.value = apiKey;
-    }
   }
   
   // Load settings
@@ -103,6 +175,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (settings.aiModel) {
     selectedModel = settings.aiModel;
   }
+  // Load provider
+  if (settings.aiProvider) {
+    currentProvider = settings.aiProvider;
+  }
+  
+  // Populate models based on provider and API key availability
+  await populateModels(currentProvider, !!apiKey);
+  
   // Load image settings
   if (settings.maxImageCount !== undefined && maxImagesInput) {
     maxImagesInput.value = settings.maxImageCount;
@@ -162,6 +242,223 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (err) {
       console.error('Failed to load app version:', err);
     }
+  }
+
+  // Provider + model settings UI
+  try {
+    const settings = await window.electronAPI.getSettings();
+    currentProvider = (settings && settings.aiProvider) ? settings.aiProvider : 'openrouter';
+
+    const providerSelect = document.getElementById('providerSelect');
+    const providerApiKeyInput = document.getElementById('providerApiKey');
+    const toggleProviderKey = document.getElementById('toggleProviderKey');
+    const providerConfigFields = document.getElementById('providerConfigFields');
+    const testProviderBtn = document.getElementById('testProviderBtn');
+    const saveProviderBtn = document.getElementById('saveProviderBtn');
+    const deleteProviderKeyBtn = document.getElementById('deleteProviderKeyBtn');
+    const providerKeyStatus = document.getElementById('providerKeyStatus');
+    const settingsModelSelect = document.getElementById('settingsModelSelect');
+
+    // Sync the model list with the workspace selector
+    if (settingsModelSelect && modelSelect) {
+      settingsModelSelect.innerHTML = modelSelect.innerHTML;
+      settingsModelSelect.value = selectedModel;
+      settingsModelSelect.addEventListener('change', () => {
+        selectedModel = settingsModelSelect.value;
+        if (modelSelect) modelSelect.value = selectedModel;
+        localStorage.setItem('ai_model', selectedModel);
+      });
+    }
+
+    function renderProviderConfig(provider, cfg = {}) {
+      if (!providerConfigFields) return;
+      let html = '';
+      if (provider === 'azure-openai') {
+        html = `
+          <label class="form-label">Azure settings</label>
+          <div class="grid-2">
+            <input id="azureEndpoint" class="modern-input" placeholder="Endpoint (https://...azure.com)" value="${(cfg.endpoint||'')}">
+            <input id="azureDeployment" class="modern-input" placeholder="Deployment name" value="${(cfg.deployment||'')}">
+          </div>
+          <input id="azureApiVersion" class="modern-input" placeholder="API version (e.g., 2024-08-01-preview)" value="${(cfg.apiVersion||'')}">`;
+      } else if (provider === 'custom-openai') {
+        html = `
+          <label class="form-label">Custom OpenAI-compatible</label>
+          <input id="customBaseUrl" class="modern-input" placeholder="Base URL (https://host/v1)" value="${(cfg.baseURL||'')}">`;
+      } else {
+        html = `<p class="form-helper">No additional configuration required for this provider.</p>`;
+      }
+      providerConfigFields.innerHTML = html;
+    }
+
+    async function loadProviderState(provider) {
+      if (providerSelect) providerSelect.value = provider;
+      try {
+        const res = await window.electronAPI.loadProviderCredentials(provider);
+        const cfg = (res && res.config) || {};
+        renderProviderConfig(provider, cfg);
+        if (providerKeyStatus) {
+          if (res && res.success) {
+            if (res.hasKey) {
+              providerKeyStatus.textContent = '✓ API key is saved for this provider';
+              providerKeyStatus.className = 'status-message success';
+            } else {
+              providerKeyStatus.textContent = 'No saved API key for this provider yet';
+              providerKeyStatus.className = 'status-message';
+            }
+          } else {
+            providerKeyStatus.textContent = `❌ ${res && res.error ? res.error : 'Failed to load credentials'}`;
+            providerKeyStatus.className = 'status-message error';
+          }
+        }
+      } catch (e) {
+        if (providerKeyStatus) {
+          providerKeyStatus.textContent = `❌ ${e && e.message}`;
+          providerKeyStatus.className = 'status-message error';
+        }
+      }
+    }
+
+    if (providerSelect) {
+      providerSelect.value = currentProvider;
+      providerSelect.addEventListener('change', async () => {
+        currentProvider = providerSelect.value;
+        await window.electronAPI.saveSettings({ aiProvider: currentProvider });
+        await loadProviderState(currentProvider);
+        // Refresh the global apiKey based on current provider
+        const keyRes = await window.electronAPI.loadApiKey();
+        apiKey = (keyRes && keyRes.success) ? (keyRes.apiKey || '') : '';
+        
+        // Refresh model list on home page
+        await populateModels(currentProvider, !!apiKey);
+      });
+    }
+
+    if (toggleProviderKey && providerApiKeyInput) {
+      toggleProviderKey.addEventListener('click', () => {
+        providerApiKeyInput.type = providerApiKeyInput.type === 'password' ? 'text' : 'password';
+      });
+    }
+
+    function collectConfig(provider) {
+      const getVal = (id) => {
+        const el = document.getElementById(id);
+        return el ? el.value.trim() : '';
+      };
+      if (provider === 'azure-openai') {
+        return {
+          endpoint: getVal('azureEndpoint'),
+          deployment: getVal('azureDeployment'),
+          apiVersion: getVal('azureApiVersion')
+        };
+      }
+      if (provider === 'custom-openai') {
+        return { baseURL: getVal('customBaseUrl') };
+      }
+      return {};
+    }
+
+    if (testProviderBtn) {
+      testProviderBtn.addEventListener('click', async () => {
+        if (providerKeyStatus) {
+          providerKeyStatus.textContent = 'Testing connection...';
+          providerKeyStatus.className = 'status-message loading';
+        }
+        try {
+          const providedKey = providerApiKeyInput ? providerApiKeyInput.value.trim() : '';
+          const cfg = collectConfig(currentProvider);
+          const result = await window.electronAPI.validateApiKeyForProvider({ provider: currentProvider, apiKey: providedKey, config: cfg });
+          if (result && result.valid) {
+            if (providerKeyStatus) {
+              providerKeyStatus.textContent = '✓ Connection successful';
+              providerKeyStatus.className = 'status-message success';
+            }
+          } else {
+            if (providerKeyStatus) {
+              providerKeyStatus.textContent = `❌ ${(result && result.error) || 'Validation failed'}`;
+              providerKeyStatus.className = 'status-message error';
+            }
+          }
+        } catch (e) {
+          if (providerKeyStatus) {
+            providerKeyStatus.textContent = `❌ ${e && e.message}`;
+            providerKeyStatus.className = 'status-message error';
+          }
+        }
+      });
+    }
+
+    if (saveProviderBtn) {
+      saveProviderBtn.addEventListener('click', async () => {
+        if (providerKeyStatus) {
+          providerKeyStatus.textContent = 'Saving provider settings...';
+          providerKeyStatus.className = 'status-message loading';
+        }
+        try {
+          const providedKey = providerApiKeyInput ? providerApiKeyInput.value.trim() : '';
+          const cfg = collectConfig(currentProvider);
+          const res = await window.electronAPI.saveProviderCredentials(currentProvider, providedKey, cfg);
+          if (res && res.success) {
+            await window.electronAPI.saveSettings({ aiProvider: currentProvider });
+            const keyRes = await window.electronAPI.loadApiKey();
+            apiKey = (keyRes && keyRes.success) ? (keyRes.apiKey || '') : '';
+            
+            // Refresh model list on home page
+            await populateModels(currentProvider, !!apiKey);
+            
+            if (providerKeyStatus) {
+              providerKeyStatus.textContent = '✓ Provider settings saved';
+              providerKeyStatus.className = 'status-message success';
+            }
+            if (providerApiKeyInput) providerApiKeyInput.value = '';
+          } else {
+            if (providerKeyStatus) {
+              providerKeyStatus.textContent = `❌ ${(res && res.error) || 'Failed to save settings'}`;
+              providerKeyStatus.className = 'status-message error';
+            }
+          }
+        } catch (e) {
+          if (providerKeyStatus) {
+            providerKeyStatus.textContent = `❌ ${e && e.message}`;
+            providerKeyStatus.className = 'status-message error';
+          }
+        }
+      });
+    }
+
+    if (deleteProviderKeyBtn) {
+      deleteProviderKeyBtn.addEventListener('click', async () => {
+        try {
+          const res = await window.electronAPI.deleteProviderCredentials(currentProvider);
+          if (res && res.success) {
+            apiKey = '';
+            
+            // Refresh model list to show "no API key" message
+            await populateModels(currentProvider, false);
+            
+            if (providerKeyStatus) {
+              providerKeyStatus.textContent = 'Key deleted for this provider';
+              providerKeyStatus.className = 'status-message';
+            }
+          } else {
+            if (providerKeyStatus) {
+              providerKeyStatus.textContent = `❌ ${(res && res.error) || 'Failed to delete key'}`;
+              providerKeyStatus.className = 'status-message error';
+            }
+          }
+        } catch (e) {
+          if (providerKeyStatus) {
+            providerKeyStatus.textContent = `❌ ${e && e.message}`;
+            providerKeyStatus.className = 'status-message error';
+          }
+        }
+      });
+    }
+
+    // Initial state
+    await loadProviderState(currentProvider);
+  } catch (e) {
+    console.warn('Provider settings init failed:', e && e.message);
   }
 });
 
@@ -311,8 +608,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const headerAction = document.getElementById('settingsHeaderAction');
 
   const panelCopy = {
-    general: 'Manage API credentials and account basics.',
-    models: 'Pick the OpenRouter model that powers your summaries.',
+    models: 'Configure your AI provider credentials.',
     image: 'Control OCR usage and combined summary limits.',
     appearance: 'Choose between light and dark appearances.',
     storage: 'Review where Squailor stores documents and adjust location.',
@@ -330,17 +626,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btn) btn.classList.add('active');
     const computedLabel = labelOverride || btn?.textContent?.replace(/^[^A-Za-z0-9]+\s*/, '') || 'Settings';
     if (titleEl) titleEl.textContent = computedLabel;
-    if (subtitleEl) subtitleEl.textContent = panelCopy[panelId] || panelCopy.general;
+    if (subtitleEl) subtitleEl.textContent = panelCopy[panelId] || panelCopy.models;
 
-    if (panelId === 'general') {
-      if (headerAction) {
-        headerAction.textContent = 'Save';
-        headerAction.style.display = 'inline-flex';
-        headerAction.onclick = () => document.getElementById('saveApiKey')?.click();
-      }
-    } else {
-      if (headerAction) headerAction.style.display = 'none';
-    }
+    // No special header action needed anymore
+    if (headerAction) headerAction.style.display = 'none';
   };
 
   sidebarButtons.forEach(btn => {
@@ -351,8 +640,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (pendingSettingsPanel) {
     setSettingsPanelActive(pendingSettingsPanel);
     pendingSettingsPanel = null;
-  } else if (document.getElementById('panel-general')) {
-    setSettingsPanelActive('general');
+  } else if (document.getElementById('panel-models')) {
+    setSettingsPanelActive('models');
   }
 });
 
@@ -595,62 +884,6 @@ if (saveStorageLocationBtn) {
     });
   }
 
-// Initialize
-if (apiKey && apiKeyInput && apiKeyStatus) {
-  apiKeyInput.value = apiKey;
-  apiKeyStatus.textContent = '✓ API Key loaded from secure storage (encrypted)';
-  apiKeyStatus.className = 'status-message success';
-  apiKeyStatus.style.display = 'block';
-}
-
-// Toggle API key visibility
-if (toggleApiKeyBtn && apiKeyInput) {
-  toggleApiKeyBtn.addEventListener('click', () => {
-    if (apiKeyInput.type === 'password') {
-      apiKeyInput.type = 'text';
-    } else {
-      apiKeyInput.type = 'password';
-    }
-  });
-}
-
-// Save API key
-if (saveApiKeyBtn && apiKeyInput && apiKeyStatus) {
-  saveApiKeyBtn.addEventListener('click', async () => {
-    const key = apiKeyInput.value.trim();
-    
-    if (!key) {
-      apiKeyStatus.textContent = '❌ Please enter an API key';
-      apiKeyStatus.className = 'status-message error';
-      apiKeyStatus.style.display = 'block';
-      return;
-    }
-
-  apiKeyStatus.textContent = 'Validating API key...';
-    apiKeyStatus.className = 'status-message loading';
-    apiKeyStatus.style.display = 'block';
-
-    const result = await window.electronAPI.validateApiKey(key);
-
-    if (result.valid) {
-      // Save to encrypted file storage
-      const saveResult = await window.electronAPI.saveApiKey(key);
-      
-      if (saveResult.success) {
-        apiKey = key;
-        apiKeyStatus.textContent = '✓ API Key validated and saved securely (encrypted)';
-        apiKeyStatus.className = 'status-message success';
-      } else {
-        apiKeyStatus.textContent = `❌ Failed to save API key: ${saveResult.error}`;
-        apiKeyStatus.className = 'status-message error';
-      }
-    } else {
-      apiKeyStatus.textContent = `❌ Invalid API key: ${result.error}`;
-      apiKeyStatus.className = 'status-message error';
-    }
-  });
-}
-
 // Select files
 if (selectFilesBtn && fileListDiv && processFilesBtn) {
   selectFilesBtn.addEventListener('click', async () => {
@@ -737,7 +970,8 @@ function getSummaryStyle() {
 if (processFilesBtn && resultsDiv && resultsSection) {
   processFilesBtn.addEventListener('click', async () => {
     if (!apiKey) {
-      showToast('Please save your OpenRouter API key first!', 'error');
+      const prov = (typeof currentProvider !== 'undefined' && currentProvider) ? currentProvider : 'your provider';
+      showToast(`Please save your API key for ${prov} first!`, 'error');
       return;
     }
 
@@ -1956,7 +2190,8 @@ function setupSummaryQaChat(item) {
     const question = input.value.trim();
     if (!question) return;
     if (!apiKey) {
-      showToast('Please save your OpenRouter API key first!', 'error');
+      const prov = (typeof currentProvider !== 'undefined' && currentProvider) ? currentProvider : 'your provider';
+      showToast(`Please save your API key for ${prov} first!`, 'error');
       return;
     }
     appendMsg('user', question);

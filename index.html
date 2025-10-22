@@ -178,31 +178,12 @@
                   <div class="option-card-body">
                     <div class="settings-form">
                       <div class="setting-group">
-                        <label for="modelSelect" class="setting-label">AI Model</label>
+                        <label for="modelSelect" class="setting-label">
+                          AI Model
+                          <span id="currentProviderLabel" class="text-muted" style="font-size: 0.7em; font-weight: normal; margin-left: 6px;">Current provider: Loading...</span>
+                        </label>
                         <select id="modelSelect" class="modern-select">
-                          <optgroup label="OpenAI">
-                            <option value="openai/gpt-4o-mini" selected>GPT-4o Mini (Recommended)</option>
-                            <option value="openai/gpt-4o">GPT-4o</option>
-                            <option value="openai/gpt-4-turbo">GPT-4 Turbo</option>
-                            <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                          </optgroup>
-                          <optgroup label="Anthropic">
-                            <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
-                            <option value="anthropic/claude-3-opus">Claude 3 Opus</option>
-                            <option value="anthropic/claude-3-haiku">Claude 3 Haiku</option>
-                          </optgroup>
-                          <optgroup label="Google">
-                            <option value="google/gemini-pro-1.5">Gemini 1.5 Pro</option>
-                            <option value="google/gemini-flash-1.5">Gemini 1.5 Flash</option>
-                          </optgroup>
-                          <optgroup label="Meta">
-                            <option value="meta-llama/llama-3.1-70b-instruct">Llama 3.1 70B</option>
-                            <option value="meta-llama/llama-3.1-8b-instruct">Llama 3.1 8B</option>
-                          </optgroup>
-                          <optgroup label="Other">
-                            <option value="mistralai/mistral-large">Mistral Large</option>
-                            <option value="perplexity/llama-3.1-sonar-large-128k-online">Perplexity Sonar</option>
-                          </optgroup>
+                          <option value="">Loading models...</option>
                         </select>
                       </div>
                       <div class="setting-toggle">
@@ -401,8 +382,7 @@
               </div>
               <nav class="settings-nav">
                 <p class="nav-group">App</p>
-                <button class="settings-nav-item active" data-panel="general">🔑 General</button>
-                <button class="settings-nav-item" data-panel="models">🤖 AI Models</button>
+                <button class="settings-nav-item active" data-panel="models">🤖 AI Providers</button>
                 <button class="settings-nav-item" data-panel="image">🖼️ Image Settings</button>
                 <button class="settings-nav-item" data-panel="appearance">🎨 Appearance</button>
                 <button class="settings-nav-item" data-panel="storage">💾 Storage</button>
@@ -416,8 +396,8 @@
             <section class="settings-content">
               <header class="settings-content-header">
                 <div>
-                  <h2 id="settingsSectionTitle">General</h2>
-                  <p id="settingsSectionSubtitle">Manage API credentials and account basics.</p>
+                  <h2 id="settingsSectionTitle">AI Providers</h2>
+                  <p id="settingsSectionSubtitle">Configure your AI provider credentials.</p>
                 </div>
                 <div class="settings-actions">
                   <button id="settingsHeaderAction" class="btn btn-primary" hidden></button>
@@ -425,59 +405,52 @@
               </header>
 
               <div class="settings-panels" id="settingsPanels">
-                <div id="panel-general" class="settings-panel active">
-                  <article class="card">
-                    <header class="card-header">
-                      <div class="card-icon">🔑</div>
-                      <div>
-                        <h3>API configuration</h3>
-                        <p>Connect your OpenRouter account to run summaries.</p>
-                      </div>
-                    </header>
-                    <div class="card-body">
-                      <div class="form-group">
-                        <label for="apiKey" class="form-label">OpenRouter API key</label>
-                        <div class="input-with-button">
-                          <input type="password" id="apiKey" class="modern-input" placeholder="sk-or-v1-..." autocomplete="off">
-                          <button id="toggleApiKey" class="icon-button" title="Show or hide API key">👁️</button>
-                        </div>
-                        <p class="form-helper">Get your API key from <a href="https://openrouter.ai/keys" target="_blank" rel="noopener">OpenRouter</a>.</p>
-                      </div>
-                      <button id="saveApiKey" class="btn btn-success">
-                        <span class="btn-icon">✓</span>
-                        <span>Validate & save key</span>
-                      </button>
-                      <div id="apiKeyStatus" class="status-message"></div>
-                    </div>
-                  </article>
-                </div>
-
-                <div id="panel-models" class="settings-panel">
+                <div id="panel-models" class="settings-panel active">
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">🤖</div>
                       <div>
-                        <h3>AI model catalog</h3>
-                        <p>Choose which OpenRouter model powers your summaries.</p>
+                        <h3>AI provider configuration</h3>
+                        <p>Choose your AI provider and configure API credentials.</p>
                       </div>
                     </header>
                     <div class="card-body">
                       <div class="form-group">
-                        <label class="form-label" for="settingsModelSelect">AI model</label>
-                        <select id="settingsModelSelect" class="modern-select"></select>
-                        <p class="form-helper">Model selection here stays in sync with the workspace.</p>
+                        <label class="form-label" for="providerSelect">AI provider</label>
+                        <select id="providerSelect" class="modern-select">
+                          <option value="openrouter">OpenRouter</option>
+                          <option value="openai">OpenAI</option>
+                          <option value="anthropic">Anthropic</option>
+                          <option value="google">Google (Gemini)</option>
+                          <option value="cohere">Cohere</option>
+                          <option value="groq">Groq</option>
+                          <option value="mistral">Mistral</option>
+                          <option value="xai">xAI</option>
+                          <option value="azure-openai">Azure OpenAI</option>
+                          <option value="custom-openai">Custom OpenAI-compatible</option>
+                        </select>
+                        <p class="form-helper">Provider settings here apply across the app.</p>
                       </div>
-                      <div class="info-box">
-                        <div class="info-icon">💡</div>
-                        <div class="info-content">
-                          <strong>Tips</strong>
-                          <ul>
-                            <li>GPT-4o Mini balances quality with cost.</li>
-                            <li>Claude 3.5 Sonnet excels at lecture-style summaries.</li>
-                            <li>Gemini Flash is ideal for quick, lightweight notes.</li>
-                          </ul>
+
+                      <div class="form-group">
+                        <label class="form-label" for="providerApiKey">API key</label>
+                        <div class="input-with-button">
+                          <input type="password" id="providerApiKey" class="modern-input" placeholder="Enter API key..." autocomplete="off">
+                          <button id="toggleProviderKey" class="icon-button" title="Show or hide API key">👁️</button>
                         </div>
+                        <p class="form-helper" id="providerKeyHelper">Your key is encrypted locally. Leave blank to keep your saved key.</p>
                       </div>
+
+                      <div class="form-group" id="providerConfigFields">
+                        <!-- Provider-specific fields will render here -->
+                      </div>
+
+                      <div class="button-row">
+                        <button id="testProviderBtn" class="btn btn-outline">Test connection</button>
+                        <button id="saveProviderBtn" class="btn btn-primary">Save settings</button>
+                        <button id="deleteProviderKeyBtn" class="btn btn-ghost">Delete saved key</button>
+                      </div>
+                      <div id="providerKeyStatus" class="status-message" style="margin-top: 8px;"></div>
                     </div>
                   </article>
                 </div>
