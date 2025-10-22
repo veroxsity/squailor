@@ -1028,6 +1028,14 @@ body.light-theme .file-item {
   animation: spin-rotate 0.8s linear infinite;
 }
 
+/* Ensure status messages with loading class don't inherit spinner styles */
+.status-message.loading {
+  width: auto !important;
+  height: auto !important;
+  border: 1px solid transparent !important;
+  display: block !important;
+}
+
 .results-section {
   display: flex;
   flex-direction: column;
@@ -1758,6 +1766,10 @@ body.light-theme .file-item {
   border-color: rgba(59, 130, 246, 0.35);
   color: #bae6fd;
   display: block;
+  /* Prevent the text from rotating - only the ::before spinner should rotate */
+  animation: none !important;
+  width: auto;
+  white-space: normal;
 }
 
 .status-message.loading::before {

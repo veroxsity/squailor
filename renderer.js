@@ -360,6 +360,11 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     if (testProviderBtn) {
       testProviderBtn.addEventListener('click', async () => {
+        // Store original button text and disable button
+        const originalText = testProviderBtn.textContent;
+        testProviderBtn.disabled = true;
+        testProviderBtn.textContent = 'Testing connection...';
+        
         if (providerKeyStatus) {
           providerKeyStatus.textContent = 'Testing connection...';
           providerKeyStatus.className = 'status-message loading';
@@ -384,6 +389,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             providerKeyStatus.textContent = `❌ ${e && e.message}`;
             providerKeyStatus.className = 'status-message error';
           }
+        } finally {
+          // Restore button
+          testProviderBtn.disabled = false;
+          testProviderBtn.textContent = originalText;
         }
       });
     }
