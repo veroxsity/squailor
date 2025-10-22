@@ -55,8 +55,10 @@
     },
     "files": [
       "**/*",
-      "!**/{.git,node_modules/.cache,dist}/*",
-      "!*.md"
+      "utils/**/*",
+      "!**/{.git,node_modules/.cache,dist,documentation}/*",
+      "!*.md",
+      "!README.md"
     ],
     "win": {
       "artifactName": "${productName}-Setup-${version}.${ext}",
