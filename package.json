@@ -54,10 +54,16 @@
       "output": "dist"
     },
     "files": [
-      "**/*",
+      "*.js",
+      "*.html",
+      "*.css",
+      "assets/**/*",
       "utils/**/*",
-      "!**/{.git,node_modules/.cache,dist,documentation}/*",
-      "!*.md",
+      "node_modules/**/*",
+      "!node_modules/.cache/**/*",
+      "!documentation/**/*",
+      "!dist/**/*",
+      "!**/*.md",
       "!README.md"
     ],
     "win": {
