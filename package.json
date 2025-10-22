@@ -89,7 +89,18 @@
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "displayLanguageSelector": false,
+      "installerHeader": "assets/icon.ico",
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico",
+      "installerSidebar": "assets/icon.ico",
+      "uninstallerSidebar": "assets/icon.ico",
+      "runAfterFinish": true,
+      "menuCategory": true,
+      "shortcutName": "Squailor",
+      "include": "scripts/installer.nsh"
     },
     
     "mac": {
