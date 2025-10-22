@@ -6,7 +6,7 @@ const { supportsVision: adapterSupportsVision } = require('./ai/providers/capabi
  * @param {string} text - Text to summarize
  * @param {string} summaryType - Type of summary ('normal' or 'short' or 'longer')
  * @param {string} apiKey - OpenRouter API key
- * @param {string} responseTone - Tone of response ('casual', 'formal', 'informative', 'easy')
+ * @param {string} responseTone - Tone of response ('casual', 'formal', 'informative', 'eli5')
  * @param {string} model - Model to use (defaults to gpt-4o-mini via OpenRouter)
  * @param {string} summaryStyle - Style of summary ('teaching' or 'notes')
  * @param {function|null} onProgress - optional callback for streaming progress
@@ -54,9 +54,9 @@ async function summarizeText(text, summaryType, arg3, responseTone = 'casual', m
       style: 'fact-focused and comprehensive',
       instructions: 'Focus on delivering factual information clearly. Use an encyclopedic style. Include relevant details and context.'
     },
-    easy: {
-      style: 'simplified and accessible',
-      instructions: 'Use simple, everyday words. Break down complex ideas into easy-to-understand concepts. Explain technical terms in plain language.'
+    eli5: {
+      style: 'extremely simple and beginner-friendly',
+      instructions: 'Explain Like I\'m 5: Use the simplest possible language, avoiding ALL jargon and technical terms. If you must use a technical term, immediately explain it using everyday words that a child could understand. Use analogies and examples from daily life. Break down every concept into the most basic building blocks. Imagine explaining to someone with absolutely no background in the subject.'
     }
   };
 
