@@ -20,8 +20,13 @@
 ## 🚀 Quick Start
 
 1. **[Download the latest release](https://github.com/veroxsity/Squailor/releases/latest)** for Windows, macOS, or Linux
-2. **Get a free [OpenRouter API key](https://openrouter.ai/keys)** (required — Squailor uses OpenRouter to access multiple AI providers)
-3. **Launch Squailor → Settings → paste your API key → Save & Validate**
+2. **Get an API key from your preferred AI provider:**
+   - [OpenRouter](https://openrouter.ai/keys) — Unified access to 10+ providers (recommended for flexibility)
+   - [OpenAI](https://platform.openai.com/api-keys) — Direct access to GPT models
+   - [Anthropic](https://console.anthropic.com/) — Claude models
+   - [Google AI Studio](https://aistudio.google.com/app/apikey) — Gemini models
+   - Or use Groq, Cohere, Mistral, xAI, Azure OpenAI
+3. **Launch Squailor → Settings → AI Providers → select provider → paste API key → Save**
 4. **Go to Home → drop your files → click Generate** — watch your summaries stream in real-time!
 
 > 💡 **Pro Tip:** Select a vision-capable model (GPT-4o, Claude 3.5 Sonnet, Gemini 1.5 Pro) to extract text from images, charts, and diagrams embedded in your documents.
@@ -30,17 +35,19 @@
 
 ## 🌟 What Squailor Does
 
-Squailor is a desktop application that reads your PDFs, PowerPoint presentations, and Word documents, then uses advanced AI models (via OpenRouter) to generate concise, customizable summaries. Everything runs locally on your machine — only the text extraction and AI requests are sent to your chosen model provider.
+Squailor is a desktop application that reads your PDFs, PowerPoint presentations, and Word documents, then uses advanced AI models from multiple providers to generate concise, customizable summaries. Everything runs locally on your machine — only the text extraction and AI requests are sent to your chosen provider.
 
 ### ⚡ Core Features
 
+- **Multi-provider AI support:** Choose from OpenRouter, OpenAI, Anthropic, Google, Cohere, Groq, Mistral, xAI, Azure OpenAI, or custom OpenAI-compatible APIs
+- **Dynamic model selection:** Model list adapts based on your active provider — see only relevant options
 - **Multi-format support:** PDF, PPTX, PPT, DOCX, DOC
 - **Vision OCR:** Extracts text from embedded images, charts, diagrams, and slides (when using vision-capable models)
 - **Live streaming:** Watch summaries generate word-by-word in real-time
 - **Customizable output:**
   - **Length:** Short (key points), Normal (balanced), or Longer (detailed)
   - **Style:** Teaching format (paragraphs & explanations) or Notes format (bullets & concise)
-  - **Tone:** Casual, Formal, Informative, or Easy-to-understand
+  - **Tone:** Casual, Formal, Informative, or ELI5 (Explain Like I'm 5)
 - **Combined summaries:** Merge up to 3 files into one cross-referenced summary that identifies themes and resolves contradictions
 - **Duplicate detection:** SHA-256 content hashing prevents reprocessing the same document
 - **Q&A chat:** Ask follow-up questions about any generated summary with streaming responses
@@ -50,9 +57,10 @@ Squailor is a desktop application that reads your PDFs, PowerPoint presentations
 ### 🔐 Privacy & Security
 
 - **Local-first:** Documents stay on your machine (stored in AppData or a portable folder you choose)
-- **Encrypted API keys:** Your OpenRouter key is encrypted at rest using AES-256
+- **Encrypted API keys:** Your API keys are encrypted at rest using AES-256-GCM with machine-specific encryption
 - **Zero telemetry:** Squailor does not track usage or send analytics
 - **Portable mode:** Run from a USB drive with all data self-contained
+- **No vendor lock-in:** Switch between AI providers anytime without losing your data
 
 ### 🎨 Modern UI
 
@@ -90,8 +98,8 @@ Prebuilt installers and portable builds are available on the [Releases page](htt
 
 1. Download a prebuilt installer from [Releases](https://github.com/veroxsity/Squailor/releases)
 2. Install and launch Squailor
-3. Get an [OpenRouter API key](https://openrouter.ai/keys) (free tier available)
-4. Go to **Settings → General → paste your API key → Validate & save key**
+3. Get an API key from your preferred provider (see Quick Start above)
+4. Go to **Settings → AI Providers → select provider → paste API key → Test connection → Save**
 5. *(Optional)* In **Settings → Image Settings**, adjust "Max Images per Document" (0–10, default 3) to control OCR usage and cost
 6. Return to **Home**, drop your files, configure summary options (Length/Style/Tone), and click **Generate**!
 
@@ -126,9 +134,9 @@ npm run build:linux    # Linux (AppImage + DEB)
 1. **Select files:** Click "📁 Browse files" or drag & drop PDFs, PPTX, or DOCX onto the upload zone
 2. **Configure summary options:**
    - **Length:** Short, Normal, or Longer
-   - **Tone:** Casual, Formal, Informative, or Easy
+   - **Tone:** Casual, Formal, Informative, or ELI5 (Explain Like I'm 5)
    - **Format:** Teaching (paragraphs) or Notes (bullets)
-   - **AI Model:** Choose from OpenAI, Anthropic Claude, Google Gemini, Meta Llama, and more (defaults to GPT-4o Mini)
+   - **AI Model:** Choose from your active provider's available models (home page shows "Current provider: [name]")
    - **Image analysis:** Toggle "Analyze images (OCR)" on/off
    - **Combined mode:** Enable "Combine files" to merge up to 3 documents into one summary
 3. **Click Generate:** Watch real-time progress with stage-by-stage status (duplicate check → extract → combine → summarize → save)
@@ -137,10 +145,13 @@ npm run build:linux    # Linux (AppImage + DEB)
 
 ### Tips
 
+- **Switch providers anytime:** Go to Settings → AI Providers to change your active AI provider
+- **Model selection updates automatically:** The model dropdown on the home page shows only models available for your current provider
 - **For vision features:** Select a model that supports images (e.g., GPT-4o, GPT-4o Mini, Claude 3.5 Sonnet, Gemini 1.5 Pro)
 - **Control costs:** Lower "Max Images per Document" in Settings → Image Settings (fewer images = fewer tokens)
 - **Combined mode best for:** Multi-part lectures, related research papers, or documents that should be cross-referenced
 - **Longer summaries:** Use the "Longer" length option for detailed explanations — the AI will preserve more content and detail
+- **ELI5 tone:** Perfect for making complex academic or technical content accessible to anyone, regardless of background
 
 ---
 
@@ -148,17 +159,24 @@ npm run build:linux    # Linux (AppImage + DEB)
 
 Squailor provides extensive configuration options via the Settings page:
 
-### 🔑 General (API Configuration)
-- **OpenRouter API Key:** Your key is encrypted at rest (AES-256) and stored in `keystore.enc`
-- **Validate & save:** Squailor tests the key before saving
-
-### 🤖 AI Models
-- Choose from **OpenAI** (GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo)
-- **Anthropic** (Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku)
-- **Google** (Gemini 1.5 Pro, Gemini 1.5 Flash)
-- **Meta** (Llama 3.1 70B, Llama 3.1 8B)
-- **Others:** Mistral Large, Perplexity Sonar, and more via OpenRouter
-- Vision-capable models unlock OCR features automatically
+### 🤖 AI Providers
+- **Provider Selection:** Choose from 10 AI providers:
+  - **OpenRouter** — Unified access to multiple providers (recommended)
+  - **OpenAI** — Direct access to GPT-4o, GPT-4o Mini, GPT-4 Turbo, GPT-3.5 Turbo
+  - **Anthropic** — Claude 3.5 Sonnet, Claude 3 Opus, Claude 3 Haiku
+  - **Google** — Gemini 1.5 Pro, Gemini 1.5 Flash, Gemini Pro
+  - **Cohere** — Command R+, Command R, Command series
+  - **Groq** — Fast Llama 3.3, Llama 3.1, Mixtral models
+  - **Mistral** — Mistral Large, Medium, Small
+  - **xAI** — Grok Beta
+  - **Azure OpenAI** — Enterprise GPT models with your Azure deployment
+  - **Custom OpenAI** — Any OpenAI-compatible API endpoint
+- **API Key Management:** Each provider has its own encrypted API key storage
+- **Provider-specific Configuration:**
+  - Azure OpenAI: Endpoint URL, Deployment name, API version
+  - Custom OpenAI: Base URL for your API endpoint
+- **Test Connection:** Validate your API key before saving
+- **Current Provider Display:** Home page shows which provider is active
 
 ### 🖼️ Image Settings
 - **Max Images per Document:** 0–10 (default: 3) — controls how many images are extracted and sent for OCR/vision analysis
@@ -181,7 +199,8 @@ Squailor provides extensive configuration options via the Settings page:
 ### 🔒 Privacy
 - Squailor does **not collect telemetry** or send analytics
 - Your documents stay on your machine
-- Only minimal text/image excerpts are sent to OpenRouter for AI processing
+- Only minimal text/image excerpts are sent to your chosen AI provider for processing
+- API keys are encrypted using AES-256-GCM with machine-specific keys
 
 ---
 
