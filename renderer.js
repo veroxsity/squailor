@@ -1830,8 +1830,14 @@ function viewFullSummary(index) {
   const openQaBtn = document.getElementById('openQaBtn');
   const qaCloseBtn = document.getElementById('qaCloseBtn');
   function openQaPanel() {
+    if (!qaSidebar || !qaResizer || !split) {
+      console.error('Missing QA elements:', { qaSidebar, qaResizer, split });
+      return;
+    }
     qaSidebar.style.display = '';
+    qaSidebar.removeAttribute('hidden');
     qaResizer.style.display = '';
+    qaResizer.removeAttribute('hidden');
     const width = savedQaW ? parseInt(savedQaW, 10) : Math.round(window.innerWidth * 0.35);
     split.style.setProperty('--qa-col', Math.max(260, Math.min(width, Math.round(window.innerWidth * 0.6))) + 'px');
     split.style.setProperty('--qa-resizer-col', '6px');
@@ -1839,6 +1845,7 @@ function viewFullSummary(index) {
     setTimeout(() => document.getElementById('qaInput')?.focus(), 0);
   }
   function closeQaPanel() {
+    if (!qaSidebar || !qaResizer || !split) return;
     split.style.setProperty('--qa-col', '0px');
     split.style.setProperty('--qa-resizer-col', '0px');
     qaSidebar.style.display = 'none';
@@ -1847,6 +1854,8 @@ function viewFullSummary(index) {
   }
   if (openQaBtn && split && qaSidebar && qaResizer) {
     openQaBtn.onclick = openQaPanel;
+  } else {
+    console.warn('QA button setup failed:', { openQaBtn: !!openQaBtn, split: !!split, qaSidebar: !!qaSidebar, qaResizer: !!qaResizer });
   }
   if (qaCloseBtn && split && qaSidebar && qaResizer) {
     qaCloseBtn.onclick = closeQaPanel;
@@ -1856,14 +1865,21 @@ function viewFullSummary(index) {
   const openTocBtn = document.getElementById('openTocBtn');
   const tocCloseBtn = document.getElementById('tocCloseBtn');
   function openTocPanel() {
+    if (!tocSidebar || !tocResizer || !split) {
+      console.error('Missing TOC elements:', { tocSidebar, tocResizer, split });
+      return;
+    }
     tocSidebar.style.display = '';
+    tocSidebar.removeAttribute('hidden');
     tocResizer.style.display = '';
+    tocResizer.removeAttribute('hidden');
     const width = savedTocW ? parseInt(savedTocW, 10) : 260;
     split.style.setProperty('--toc-col', Math.max(220, Math.min(width, Math.round(window.innerWidth * 0.4))) + 'px');
     split.style.setProperty('--toc-resizer-col', '6px');
     localStorage.setItem('ui.tocOpen', 'true');
   }
   function closeTocPanel() {
+    if (!tocSidebar || !tocResizer || !split) return;
     split.style.setProperty('--toc-col', '0px');
     split.style.setProperty('--toc-resizer-col', '0px');
     tocSidebar.style.display = 'none';
@@ -1872,6 +1888,8 @@ function viewFullSummary(index) {
   }
   if (openTocBtn && split && tocSidebar && tocResizer) {
     openTocBtn.onclick = openTocPanel;
+  } else {
+    console.warn('TOC button setup failed:', { openTocBtn: !!openTocBtn, split: !!split, tocSidebar: !!tocSidebar, tocResizer: !!tocResizer });
   }
   if (tocCloseBtn && split && tocSidebar && tocResizer) {
     tocCloseBtn.onclick = closeTocPanel;
