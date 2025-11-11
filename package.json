@@ -6,13 +6,13 @@
   "scripts": {
     "start": "electron .",
     "dev": "set NODE_ENV=development&& electron .",
-  "build": "node scripts/build.js",
-  "prebuild": "node scripts/verify-deps.js",
-  "build:win": "node scripts/build.js --win",
-  "build:portable": "node scripts/build.js --win zip",
-  "build:installer": "node scripts/build.js --win nsis",
-  "build:mac": "node scripts/build.js --mac",
-  "build:linux": "node scripts/build.js --linux",
+    "build": "node scripts/build.js",
+    "prebuild": "node scripts/verify-deps.js",
+    "build:win": "node scripts/build.js --win",
+    "build:portable": "node scripts/build.js --win zip",
+    "build:installer": "node scripts/build.js --win nsis",
+    "build:mac": "node scripts/build.js --mac",
+    "build:linux": "node scripts/build.js --linux",
     "test": "echo \"Error: no test specified\" && exit 1",
     "make-icon": "node scripts/make-icon.js"
   },
@@ -27,17 +27,19 @@
   "author": "veroxsity <veroxsity@gmail.com>",
   "license": "ISC",
   "dependencies": {
-  "electron-updater": "^6.6.2",
-    "electron-log": "^4.4.7",
-    "jszip": "^3.10.1",
-    "marked": "^16.3.0",
-    "openai": "^6.0.1",
     "@anthropic-ai/sdk": "^0.22.0",
     "@google/generative-ai": "^0.17.0",
     "cohere-ai": "^7.13.0",
+    "electron-log": "^4.4.7",
+    "electron-updater": "^6.6.2",
+    "image-size": "^2.0.2",
+    "jszip": "^3.10.1",
+    "marked": "^16.3.0",
+    "openai": "^6.0.1",
     "pdf-lib": "^1.17.1",
     "pdf-parse-fork": "^1.2.0",
     "pdfjs-dist": "^5.4.149",
+    "pdfkit": "^0.17.2",
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
@@ -102,7 +104,6 @@
       "shortcutName": "Squailor",
       "include": "scripts/installer.nsh"
     },
-    
     "mac": {
       "target": [
         "dmg",
@@ -118,14 +119,13 @@
       ],
       "icon": "assets/icon.png",
       "category": "Utility"
-    }
-  ,
-  "publish": [
-    {
-      "provider": "github",
-      "owner": "veroxsity",
-      "repo": "Squailor"
-    }
-  ]
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "veroxsity",
+        "repo": "Squailor"
+      }
+    ]
   }
 }

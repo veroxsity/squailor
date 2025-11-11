@@ -1543,11 +1543,29 @@ ipcMain.handle('read-stored-file', async (event, folderId) => {
     
     // Read the actual document file
     const filePath = path.join(folderPath, summaryData.fileName);
+
+    // If the stored file is a PPT/DOC (or similar), attempt to convert to PDF for preview.
+    const officeExts = new Set(['.pptx', '.ppt', '.docx', '.doc']);
+    if (officeExts.has(path.extname(summaryData.fileName).toLowerCase())) {
+      try {
+        // Lazy-load converter util
+        const converter = require('./utils/convertToPdf');
+        const res = await converter.convertToPdfIfNeeded(folderPath, summaryData.fileName);
+        if (res && res.success) {
+          return { success: true, data: res.data, mimeType: res.mimeType || 'application/pdf', fileName: summaryData.fileName };
+        }
+        // otherwise fallthrough to returning original bytes
+      } catch (err) {
+        // Log but continue to fallback
+        console.warn('convertToPdf failed:', err && err.message);
+      }
+    }
+
     const dataBuffer = await fs.readFile(filePath);
-    
-    return { 
-      success: true, 
-      data: dataBuffer.toString('base64'), 
+
+    return {
+      success: true,
+      data: dataBuffer.toString('base64'),
       mimeType: getMimeType(summaryData.fileName),
       fileName: summaryData.fileName
     };

@@ -2091,8 +2091,47 @@ async function loadDocumentViewer(index, item) {
   
   if (item.fileType === '.pdf') {
     await loadPDFViewer(viewerDiv, item.folderId);
-  } else if (item.fileType === '.pptx' || item.fileType === '.ppt') {
-    await loadPPTViewer(viewerDiv, item);
+  } else if (item.fileType === '.pptx' || item.fileType === '.ppt' || item.fileType === '.docx' || item.fileType === '.doc') {
+    // Try to read the stored file first — the main process may have converted it to PDF for preview
+    try {
+      const fileData = await window.electronAPI.readStoredFile(item.folderId);
+      if (fileData && fileData.success && fileData.mimeType === 'application/pdf') {
+        // Build blob URL and inject iframe
+        const blob = base64ToBlob(fileData.data, fileData.mimeType);
+        const url = URL.createObjectURL(blob);
+        viewerDiv.innerHTML = `
+          <iframe 
+            src="${url}"
+            class="pdf-viewer"
+            title="PDF Document">
+          </iframe>
+        `;
+        return;
+      }
+    } catch (err) {
+      console.warn('Failed to load converted preview:', err && err.message);
+    }
+
+    // Fallback: show a simple preview using the stored preview text
+    // Use a generic viewer for both PPTX and DOCX when no PDF preview is available
+    const subtitle = (item.fileType === '.docx' || item.fileType === '.doc') ? 'Word Document' : 'Presentation';
+    viewerDiv.innerHTML = `
+      <div class="ppt-viewer">
+        <div class="ppt-info">
+          <span class="ppt-icon">📄</span>
+          <div>
+            <div class="ppt-title">${escapeHtml(item.fileName)}</div>
+            <div class="ppt-subtitle">${escapeHtml(subtitle)}</div>
+          </div>
+        </div>
+        <div class="ppt-content">
+          ${escapeHtml(item.preview)}
+        </div>
+        <div class="ppt-note">
+          💡 Full content was used for summarization
+        </div>
+      </div>
+    `;
   } else if (item.fileType === '.aggregate') {
     viewerDiv.innerHTML = `
       <div class="ppt-viewer">
