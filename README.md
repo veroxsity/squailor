@@ -71,6 +71,22 @@ Squailor is a desktop application that reads your PDFs, PowerPoint presentations
 
 ---
 
+## ⭐ Coming Soon: Premium Plans
+
+**Don't want to manage your own API keys?** We're working on a premium subscription option that gives you access to Squailor's AI features without needing your own API key.
+
+### Planned Premium Tiers
+
+- **Premium Starter** (~$9.99/month) — 200 summaries, 25 Q&A interactions, GPT-4o Mini & Claude Haiku
+- **Premium Pro** (~$24.99/month) — 750 summaries, 100 Q&A, all features including vision/OCR
+- **Premium Business** (~$79.99/month) — 3,000 summaries, 500 Q&A, priority processing
+
+**Free Tier** will always remain available — bring your own API key and use Squailor without limits!
+
+*Premium plans are currently in development. Pricing may change before launch. [Track progress](https://github.com/veroxsity/Squailor/issues)*
+
+---
+
 ## ⬇️ Downloads
 
 Prebuilt installers and portable builds are available on the [Releases page](https://github.com/veroxsity/Squailor/releases):
