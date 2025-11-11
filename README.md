@@ -77,9 +77,9 @@ Squailor is a desktop application that reads your PDFs, PowerPoint presentations
 
 ### Planned Premium Tiers
 
-- **Premium Starter** (~$9.99/month) — 200 summaries, 25 Q&A interactions, GPT-4o Mini & Claude Haiku
-- **Premium Pro** (~$24.99/month) — 750 summaries, 100 Q&A, all features including vision/OCR
-- **Premium Business** (~$79.99/month) — 3,000 summaries, 500 Q&A, priority processing
+- **Premium Starter** (~£7.99/month) — 200 summaries, 25 Q&A interactions, GPT-4o Mini & Claude Haiku
+- **Premium Pro** (~£19.99/month) — 750 summaries, 100 Q&A, all features including vision/OCR
+- **Premium Business** (~£59.99/month) — 3,000 summaries, 500 Q&A, priority processing
 
 **Free Tier** will always remain available — bring your own API key and use Squailor without limits!
 
