@@ -36,5 +36,8 @@ dist/
 # Local Data Dir
 data/
 
+# Premium plan (private business plans)
+premium-plan/
+
 # Workspace settings
 Squailor.code-workspace
