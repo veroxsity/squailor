@@ -1014,7 +1014,6 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
         fileType: ext,
         success: true,
         originalLength: text.length,
-        originalText: text,
         summary
       });
 

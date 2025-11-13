@@ -53,6 +53,113 @@ const headerCopy = {
 let setSettingsPanelActive = null;
 let pendingSettingsPanel = null;
 
+// Global processing progress listener state
+let progressListenerAttached = false;
+let currentFileIndexMap = new Map();
+
+function attachProcessingProgressListener() {
+  if (progressListenerAttached) return;
+  if (!window.electronAPI || !window.electronAPI.onProcessingProgress) return;
+  window.electronAPI.onProcessingProgress((data) => {
+    // console.log('Processing:', data); // optionally gate under dev
+    // Resolve file index from the active run's map
+    const fileIndex = currentFileIndexMap.get(data.fileName);
+    if (fileIndex === undefined) return; // ignore stale events or unrelated
+
+    const statusElement = document.getElementById(`file-status-${fileIndex}`);
+    const progressElement = document.getElementById(`file-progress-${fileIndex}`);
+    if (!statusElement) return;
+
+    const stageConfig = {
+      'init': { emoji: '🔄', color: '#667eea' },
+      'duplicate-check': { emoji: '🔍', color: '#667eea' },
+      'cleanup': { emoji: '🧹', color: '#f59e0b' },
+      'setup': { emoji: '📁', color: '#667eea' },
+      'storing': { emoji: '💾', color: '#667eea' },
+      'extracting': { emoji: '📖', color: '#667eea' },
+      'extracted': { emoji: '✅', color: '#10b981' },
+      'combining': { emoji: '🧩', color: '#8b5cf6' },
+      'summarizing': { emoji: '🤖', color: '#8b5cf6' },
+      'saving': { emoji: '✅', color: '#10b981' },
+      'complete': { emoji: '✓', color: '#10b981' },
+      'cancelled': { emoji: '⏸️', color: '#ef4444' },
+      'error': { emoji: '❌', color: '#ef4444' }
+    };
+    const config = stageConfig[data.stage] || { emoji: '⏳', color: '#667eea' };
+
+    if (data.stage === 'error' && data.errorType) {
+      if (data.errorType === 'rate-limit') {
+        config.emoji = '⏱️';
+        config.color = '#f59e0b';
+      } else if (data.errorType === 'quota') {
+        config.emoji = '💳';
+        config.color = '#ef4444';
+      } else if (data.errorType === 'api-key') {
+        config.emoji = '🔑';
+        config.color = '#ef4444';
+      }
+    }
+
+    let statusText = `${config.emoji} ${data.status}`;
+    if (data.stage !== 'error') {
+      if (data.fileIndex && data.totalFiles) {
+        statusText = `[${data.fileIndex}/${data.totalFiles}] ${statusText}`;
+      }
+      if (data.charCount) {
+        statusText += ` (${data.charCount.toLocaleString()} chars)`;
+      }
+    }
+    statusElement.textContent = statusText;
+    statusElement.style.color = config.color;
+    statusElement.style.fontWeight = '500';
+
+    if (data.stage === 'summarizing' && data.delta) {
+      let ticker = statusElement.nextElementSibling;
+      const id = `ai-ticker-${fileIndex}`;
+      if (!ticker || !ticker.classList || !ticker.classList.contains('ai-ticker')) {
+        ticker = document.createElement('div');
+        ticker.className = 'ai-ticker';
+        ticker.id = id;
+        statusElement.parentNode.insertBefore(ticker, statusElement.nextSibling);
+      }
+      ticker.textContent = (ticker.textContent + data.delta).slice(-180);
+    }
+
+    if (data.errorType === 'rate-limit') {
+      statusElement.style.whiteSpace = 'normal';
+      statusElement.style.lineHeight = '1.4';
+    }
+
+    if (progressElement) {
+      if (data.stage === 'complete' || data.stage === 'error' || data.stage === 'cancelled') {
+        progressElement.style.display = 'none';
+      } else {
+        progressElement.style.display = 'block';
+        const progressFill = progressElement.querySelector('.progress-fill');
+        if (progressFill) {
+          const stageProgress = {
+            'init': '10%',
+            'duplicate-check': '20%',
+            'setup': '30%',
+            'storing': '40%',
+            'extracting': '60%',
+            'extracted': '60%',
+            'combining': '70%',
+            'summarizing': '85%',
+            'saving': '95%'
+          };
+          progressFill.style.width = stageProgress[data.stage] || '50%';
+          progressFill.style.background = `linear-gradient(90deg, ${config.color}, ${config.color}cc)`;
+        }
+      }
+    }
+  });
+  progressListenerAttached = true;
+}
+
+// attach once on load
+attachProcessingProgressListener();
+
 // Storage settings elements
 const storageAppDataRadio = document.getElementById('storageAppData');
 const storageLocalAppRadio = document.getElementById('storageLocalApp');
@@ -1006,123 +1113,11 @@ if (processFilesBtn && resultsDiv && resultsSection) {
     const responseTone = getResponseTone();
     const summaryStyle = getSummaryStyle();  // Get the selected style
     
-    // Create a map to track file indices by filename
-    const fileIndexMap = new Map();
+    // Build index map for the current run and share with global listener
+    currentFileIndexMap = new Map();
     selectedFiles.forEach((filePath, index) => {
       const fileName = filePath.split(/[/\\]/).pop();
-      fileIndexMap.set(fileName, index);
-    });
-
-    // Listen for progress updates
-    window.electronAPI.onProcessingProgress((data) => {
-      console.log('Processing:', data);
-      
-      // Find the file index
-      const fileIndex = fileIndexMap.get(data.fileName);
-      if (fileIndex !== undefined) {
-        const statusElement = document.getElementById(`file-status-${fileIndex}`);
-        const progressElement = document.getElementById(`file-progress-${fileIndex}`);
-        
-  if (statusElement) {
-          // Get stage emoji and color
-          const stageConfig = {
-            'init': { emoji: '🔄', color: '#667eea' },
-            'duplicate-check': { emoji: '🔍', color: '#667eea' },
-            'cleanup': { emoji: '🧹', color: '#f59e0b' },
-            'setup': { emoji: '📁', color: '#667eea' },
-            'storing': { emoji: '💾', color: '#667eea' },
-            'extracting': { emoji: '📖', color: '#667eea' },
-            'extracted': { emoji: '✅', color: '#10b981' },
-            'combining': { emoji: '🧩', color: '#8b5cf6' },
-            'summarizing': { emoji: '🤖', color: '#8b5cf6' },
-            'saving': { emoji: '✅', color: '#10b981' },
-            'complete': { emoji: '✓', color: '#10b981' },
-            'cancelled': { emoji: '⏸️', color: '#ef4444' },
-            'error': { emoji: '❌', color: '#ef4444' }
-          };
-          
-          const config = stageConfig[data.stage] || { emoji: '⏳', color: '#667eea' };
-          
-          // For errors, customize the emoji based on error type
-          if (data.stage === 'error' && data.errorType) {
-            if (data.errorType === 'rate-limit') {
-              config.emoji = '⏱️';
-              config.color = '#f59e0b'; // Orange for rate limit
-            } else if (data.errorType === 'quota') {
-              config.emoji = '💳';
-              config.color = '#ef4444';
-            } else if (data.errorType === 'api-key') {
-              config.emoji = '🔑';
-              config.color = '#ef4444';
-            }
-          }
-          
-          // Update status text with progress indicator
-          let statusText = `${config.emoji} ${data.status}`;
-          
-          // For errors, keep the full message (already user-friendly)
-          if (data.stage !== 'error') {
-            if (data.fileIndex && data.totalFiles) {
-              statusText = `[${data.fileIndex}/${data.totalFiles}] ${statusText}`;
-            }
-            if (data.charCount) {
-              statusText += ` (${data.charCount.toLocaleString()} chars)`;
-            }
-          } else {
-            // For errors, just show the emoji and message
-            statusText = `${config.emoji} ${data.status}`;
-          }
-          
-          statusElement.textContent = statusText;
-          statusElement.style.color = config.color;
-          statusElement.style.fontWeight = '500';
-          // Optional: show a brief ticker when AI is streaming
-          if (data.stage === 'summarizing' && data.delta) {
-            let ticker = statusElement.nextElementSibling;
-            const id = `ai-ticker-${fileIndex}`;
-            if (!ticker || !ticker.classList || !ticker.classList.contains('ai-ticker')) {
-              ticker = document.createElement('div');
-              ticker.className = 'ai-ticker';
-              ticker.id = id;
-              statusElement.parentNode.insertBefore(ticker, statusElement.nextSibling);
-            }
-            // Keep ticker to a reasonable size
-            ticker.textContent = (ticker.textContent + data.delta).slice(-180);
-          }
-          
-          // For rate limit errors, make the text wrap properly
-          if (data.errorType === 'rate-limit') {
-            statusElement.style.whiteSpace = 'normal';
-            statusElement.style.lineHeight = '1.4';
-          }
-          
-          // Show/update progress bar for active stages
-          if (progressElement) {
-            if (data.stage === 'complete' || data.stage === 'error' || data.stage === 'cancelled') {
-              progressElement.style.display = 'none';
-            } else {
-              progressElement.style.display = 'block';
-              const progressFill = progressElement.querySelector('.progress-fill');
-              if (progressFill) {
-                // Animate progress based on stage
-                const stageProgress = {
-                  'init': '10%',
-                  'duplicate-check': '20%',
-                  'setup': '30%',
-                  'storing': '40%',
-                  'extracting': '60%',
-                  'extracted': '60%',
-                  'combining': '70%',
-                  'summarizing': '85%',
-                  'saving': '95%'
-                };
-                progressFill.style.width = stageProgress[data.stage] || '50%';
-                progressFill.style.background = `linear-gradient(90deg, ${config.color}, ${config.color}cc)`;
-              }
-            }
-          }
-        }
-      }
+      currentFileIndexMap.set(fileName, index);
     });
 
     try {
