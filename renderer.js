@@ -1757,6 +1757,24 @@ function viewFullSummary(index) {
   
   // Parse markdown and render
   const contentDiv = document.getElementById('summaryViewContent');
+  // Canvas guidance banner (optional) – show once per view if PDF and no images were extracted
+  try {
+    const guidanceHost = document.getElementById('canvasGuidance');
+    if (guidanceHost) guidanceHost.remove();
+    const isPdf = /\.pdf$/i.test(item.fileName);
+    const hadImages = Array.isArray(item.images) && item.images.length > 0; // if we later persist image metadata
+    if (isPdf && !hadImages) {
+      // Provide a subtle hint if thumbnails were not generated
+      const banner = document.createElement('div');
+      banner.id = 'canvasGuidance';
+      banner.className = 'status-message info';
+      banner.style.margin = '12px 0';
+      banner.innerHTML = '🖼️ PDF thumbnails not available. Enable vision with images by installing optional Canvas dependencies or using a vision-capable model.';
+      if (contentDiv && contentDiv.parentElement) {
+        contentDiv.parentElement.insertBefore(banner, contentDiv);
+      }
+    }
+  } catch (_) {}
   try {
     // Check if marked is available
     if (typeof marked !== 'undefined' && marked.parse) {
