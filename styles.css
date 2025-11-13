@@ -1343,7 +1343,8 @@ body.light-theme .file-item {
   grid-template-columns: var(--toc-col) var(--toc-resizer-col) minmax(0, 1fr) var(--qa-resizer-col) var(--qa-col);
   gap: 0;
   align-items: stretch;
-  min-height: 70vh;
+  height: calc(100vh - 220px); /* Fixed height based on viewport */
+  overflow: hidden;
 }
 
 /* Ensure grid placement: [toc][toc-resizer][main][qa-resizer][qa] */
@@ -1474,6 +1475,8 @@ body.light-theme .file-item {
 .qa-panel {
   border-left: 1px solid rgba(148, 163, 184, 0.14);
   gap: 16px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .qa-transcript {
@@ -1482,6 +1485,16 @@ body.light-theme .file-item {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
+}
+
+.qa-transcript::-webkit-scrollbar {
+  width: 8px;
+}
+
+.qa-transcript::-webkit-scrollbar-thumb {
+  background: rgba(102, 126, 234, 0.4);
+  border-radius: 6px;
 }
 
 .qa-msg {
@@ -1550,6 +1563,7 @@ body.light-theme .file-item {
 .toc-panel,
 .qa-panel {
   min-width: 260px;
+  max-width: 600px;
 }
 
 .settings-layout {

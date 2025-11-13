@@ -571,7 +571,13 @@ app.whenReady().then(async () => {
     }
   } catch (e) {
     try { logStartup('blockingCheckException:' + (e && e.message)); } catch (err) {}
-    log.error('Error during blocking update check:', e && e.message);
+    // 'log' may not be defined in this scope if electron-log was not initialized; fall back safely
+    try {
+      const electronLog = require('electron-log');
+      electronLog.error('Error during blocking update check:', e && e.message);
+    } catch (_) {
+      console.warn('Error during blocking update check (fallback):', e && e.message);
+    }
   }
 
   createMainWindow();
@@ -716,10 +722,16 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
         stage: 'duplicate-check'
       });
       
-      const fileHash = await calculateFileHash(filePath);
+      // Compute new SHA-256 hash plus legacy MD5 for backward duplicate detection
+      const fileHash = await calculateFileHash(filePath); // SHA-256
+      let legacyMd5 = '';
+      try {
+        const fh = require('./utils/fileHash');
+        if (fh.calculateLegacyMd5) legacyMd5 = await fh.calculateLegacyMd5(filePath);
+      } catch (_) { legacyMd5 = ''; }
       
-      // Check for duplicates
-      const duplicateCheck = await findDuplicateDocument(fileHash);
+      // Check for duplicates (match either new SHA-256 or legacy MD5 stored hash)
+      const duplicateCheck = await findDuplicateDocument(fileHash, legacyMd5);
       
       if (duplicateCheck.exists) {
         // Show duplicate dialog to user
@@ -1649,7 +1661,7 @@ ipcMain.handle('get-app-version', () => {
 ipcMain.handle('change-storage-location', async (event, storageLocation) => {
   try {
     let newDataPath;
-    
+
     switch (storageLocation) {
       case 'appdata':
         newDataPath = defaultDataPath;
@@ -1660,73 +1672,73 @@ ipcMain.handle('change-storage-location', async (event, storageLocation) => {
       default:
         return { success: false, error: 'Invalid storage location' };
     }
-    
+
+    // If already using this location, short‑circuit
+    if (dataPath === newDataPath) {
+      return { success: true, path: documentsStoragePath, dataPath }; // nothing to do
+    }
+
     const newDocumentsPath = path.join(newDataPath, 'documents');
     const newSettingsPath = path.join(newDataPath, 'settings.json');
     const newKeystorePath = path.join(newDataPath, 'keystore.enc');
-    
-    // Create new directories
+
+    // Ensure target directories exist
     await ensureDataDirectories(newDataPath);
-    
-    // Store old paths
+
+    // Capture old paths (for rollback / cleanup)
     const oldDataPath = dataPath;
     const oldDocsPath = documentsStoragePath;
     const oldSettingsPath = settingsPath;
     const oldKeystorePath = keystorePath;
-    
+
+    let copyErrors = [];
+
     if (oldDocsPath !== newDocumentsPath) {
       try {
-        // Move documents
-        const files = await fs.readdir(oldDocsPath);
-        for (const file of files) {
-          const oldFilePath = path.join(oldDocsPath, file);
-          const newFilePath = path.join(newDocumentsPath, file);
-          await fs.copyFile(oldFilePath, newFilePath);
+        // Read entries (documents are folders)
+        const entries = await fs.readdir(oldDocsPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const source = path.join(oldDocsPath, entry.name);
+          const dest = path.join(newDocumentsPath, entry.name);
+          try {
+            if (entry.isDirectory()) {
+              // Recursive copy of entire document folder
+              await fs.cp(source, dest, { recursive: true, force: true });
+            } else {
+              // In case there are stray files (legacy)
+              await fs.copyFile(source, dest);
+            }
+          } catch (err) {
+            copyErrors.push({ item: entry.name, error: err.message });
+          }
         }
-        
-        // Copy settings file if exists
-        try {
-          await fs.copyFile(oldSettingsPath, newSettingsPath);
-        } catch (err) {
-          // Settings file might not exist yet
+
+        // Copy settings if present
+        await fs.copyFile(oldSettingsPath, newSettingsPath).catch(() => {});
+        // Copy keystore if present
+        await fs.copyFile(oldKeystorePath, newKeystorePath).catch(() => {});
+
+        // Only remove old data if all copies succeeded
+        if (copyErrors.length === 0) {
+          // Remove old directories atomically (best‑effort)
+          await fs.rm(oldDocsPath, { recursive: true, force: true }).catch(() => {});
+          // Do not remove oldDataPath entirely if other files may remain; attempt then ignore failure
+          await fs.rm(oldDataPath, { recursive: true, force: true }).catch(() => {});
+        } else {
+          console.warn('Storage migration completed with errors; old data retained for safety:', copyErrors);
         }
-        
-        // Copy keystore file if exists
-        try {
-          await fs.copyFile(oldKeystorePath, newKeystorePath);
-        } catch (err) {
-          // Keystore file might not exist yet
-        }
-        
-        // Delete old files after successful copy
-        for (const file of files) {
-          await fs.unlink(path.join(oldDocsPath, file)).catch(() => {});
-        }
-        
-        // Delete old keystore and settings
-        await fs.unlink(oldKeystorePath).catch(() => {});
-        await fs.unlink(oldSettingsPath).catch(() => {});
-        
-        // Try to remove old directories if they're empty
-        try {
-          await fs.rmdir(oldDocsPath);
-          await fs.rmdir(oldDataPath);
-        } catch (err) {
-          // Directories might not be empty or might fail to delete, that's ok
-          console.log('Could not delete old directories (they may not be empty):', err.message);
-        }
-      } catch (error) {
-        console.log('No files to move or old path does not exist');
+      } catch (err) {
+        console.warn('Storage migration: old documents path inaccessible or empty:', err.message);
       }
     }
-    
-    // Update current paths
+
+    // Update global path references regardless of partial errors (user intent is to switch)
     dataPath = newDataPath;
     documentsStoragePath = newDocumentsPath;
     settingsPath = newSettingsPath;
     keystorePath = newKeystorePath;
-    
-    // Save new settings
+
+    // Persist settings update
     const currentSettings = await loadSettings();
     const updatedSettings = {
       ...currentSettings,
@@ -1734,8 +1746,8 @@ ipcMain.handle('change-storage-location', async (event, storageLocation) => {
       dataPath: newDataPath
     };
     await saveSettings(updatedSettings);
-    
-    return { success: true, path: newDocumentsPath, dataPath: newDataPath };
+
+    return { success: copyErrors.length === 0, path: newDocumentsPath, dataPath: newDataPath, errors: copyErrors };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -1872,7 +1884,7 @@ function generateShortUUID() {
 }
 
 // Check if a document with the same hash already exists
-async function findDuplicateDocument(fileHash) {
+async function findDuplicateDocument(fileHash, legacyMd5) {
   try {
     const entries = await fs.readdir(documentsStoragePath, { withFileTypes: true });
     const folders = entries.filter(entry => entry.isDirectory());
@@ -1883,7 +1895,8 @@ async function findDuplicateDocument(fileHash) {
         const data = await fs.readFile(summaryPath, 'utf8');
         const summaryData = JSON.parse(data);
         
-        if (summaryData.fileHash === fileHash) {
+        // Match against current SHA-256 or legacy MD5
+        if (summaryData.fileHash === fileHash || (legacyMd5 && summaryData.fileHash === legacyMd5)) {
           return {
             exists: true,
             folderId: folder.name,

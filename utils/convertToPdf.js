@@ -3,7 +3,21 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { PDFDocument, rgb } = require('pdf-lib');
 const PDFKit = require('pdfkit');
-const sizeOf = require('image-size');
+
+// Robust import shim for image-size across versions/bundlers
+let sizeOf;
+try {
+  const mod = require('image-size');
+  sizeOf = typeof mod === 'function'
+    ? mod
+    : (mod && typeof mod.imageSize === 'function')
+      ? mod.imageSize
+      : (mod && typeof mod.default === 'function')
+        ? mod.default
+        : null;
+} catch (e) {
+  sizeOf = null;
+}
 
 // Try to convert office-like files to PDF for previewing.
 // Strategy:
@@ -76,13 +90,19 @@ async function convertToPdfIfNeeded(folderPath, fileName, onProgress) {
       await fs.unlink(vbsPath).catch(() => {});
       
       if (result) {
+        // Verify COM export actually produced the file before reading
+        try {
+          await fs.access(outPdfPath);
+        } catch {
+          throw new Error('PowerPoint automation produced no PDF');
+        }
         fireProgress({ type: 'complete', stage: 'powerpoint' });
         const buf = await fs.readFile(outPdfPath);
         return { success: true, data: buf.toString('base64'), mimeType: 'application/pdf' };
       }
     } catch (err) {
-      // Fall through to LibreOffice
-      console.log('PowerPoint automation failed:', err.message);
+      // Fall through to LibreOffice/fallback with a concise, expected message
+      console.warn('PowerPoint automation unavailable or produced no PDF; falling back. Reason:', err.message);
     }
   }
 
@@ -257,51 +277,82 @@ async function convertToPdfIfNeeded(folderPath, fileName, onProgress) {
 
             // Then add images
             for (const img of images) {
-              const imgData = await fs.promises.readFile(img.path);
-              doc.addPage();
+              // Skip images without valid paths or data URLs
+              if (!img || (!img.path && !img.dataUrl)) {
+                console.warn('Skipping image without path or dataUrl - slideNumber:', img?.slideNumber, 'altText:', img?.altText);
+                continue;
+              }
               
+              // Get image data from either file path or data URL
+              let imgData;
+              if (img.path) {
+                // Load from file path
+                imgData = await fs.readFile(img.path);
+              } else if (img.dataUrl) {
+                // Convert data URL to buffer
+                const base64Data = img.dataUrl.split(',')[1];
+                if (!base64Data) {
+                  console.warn('Invalid dataUrl format - slideNumber:', img?.slideNumber);
+                  continue;
+                }
+                imgData = Buffer.from(base64Data, 'base64');
+              }
+              
+              doc.addPage();
+
               // Calculate dimensions to fit the image within the page while maintaining aspect ratio
               const maxWidth = pageWidth - (2 * margin);  // Available width
               const maxHeight = pageHeight - (2 * margin); // Available height
-              
-              const dims = sizeOf(imgData);
-              let { width, height } = dims;
-              
-              if (width > maxWidth) {
-                const ratio = maxWidth / width;
-                width = maxWidth;
-                height = height * ratio;
+
+              // Prefer exact centering using image-size if available; otherwise use PDFKit's fit as fallback
+              try {
+                if (sizeOf && typeof sizeOf === 'function') {
+                  const { width: iw, height: ih } = sizeOf(imgData);
+                  let width = iw;
+                  let height = ih;
+
+                  if (width > maxWidth) {
+                    const ratio = maxWidth / width;
+                    width = maxWidth;
+                    height = height * ratio;
+                  }
+
+                  if (height > maxHeight) {
+                    const ratio = maxHeight / height;
+                    height = maxHeight;
+                    width = width * ratio;
+                  }
+
+                  // Center the image on the page
+                  const x = margin + (maxWidth - width) / 2;
+                  const y = margin + (maxHeight - height) / 2;
+
+                  doc.image(imgData, x, y, { width, height });
+                } else {
+                  // Fallback: let PDFKit scale to fit within the margins
+                  console.warn('image-size not available; using fit() placement');
+                  doc.image(imgData, margin, margin, { fit: [maxWidth, maxHeight] });
+                }
+              } catch (err) {
+                // If anything goes wrong with sizing, still try to draw the image with fit
+                console.warn('Image placement failed, using fit fallback:', err?.message || err);
+                doc.image(imgData, margin, margin, { fit: [maxWidth, maxHeight] });
               }
-              
-              if (height > maxHeight) {
-                const ratio = maxHeight / height;
-                height = maxHeight;
-                width = width * ratio;
-              }
-              
-              // Center the image on the page
-              const x = 40 + (maxWidth - width) / 2;
-              const y = 40 + (maxHeight - height) / 2;
-              
-              doc.image(imgData, x, y, {
-                width,
-                height
-              });
             }
 
             doc.end();
           });
-          
-          return pdfBytes;
-        } catch (err) {
-          console.error('Error generating PDF with PDFKit:', err);
-          throw err;
-        }
-          // Save generated PDF
+
+          // Save generated PDF and return result
           fireProgress({ type: 'progress', stage: 'fallback', detail: 'Saving PDF...' });
           await fs.writeFile(outPdfPath, pdfBytes).catch(() => {});
           fireProgress({ type: 'complete', data: pdfBytes.toString('base64'), mimeType: 'application/pdf' });
           return { success: true, data: pdfBytes.toString('base64'), mimeType: 'application/pdf' };
+        } catch (err) {
+          console.error('Error generating PDF with PDFKit:', err);
+          throw err;
+        }
+          
       }
     }
   } catch (err) {

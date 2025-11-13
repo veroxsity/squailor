@@ -1774,7 +1774,19 @@ function viewFullSummary(index) {
       });
       
       const htmlContent = marked.parse(item.summary);
-      contentDiv.innerHTML = htmlContent;
+      // Sanitize HTML to prevent XSS from model output (e.g., scripts, iframes)
+      try {
+        if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
+          const sanitized = DOMPurify.sanitize(htmlContent, { USE_PROFILES: { html: true } });
+          contentDiv.innerHTML = sanitized;
+        } else {
+          console.warn('DOMPurify not available, injecting unsanitized HTML');
+          contentDiv.innerHTML = htmlContent; // fallback
+        }
+      } catch (sanError) {
+        console.error('Sanitization error, reverting to escaped text:', sanError);
+        contentDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">${escapeHtml(item.summary)}</pre>`;
+      }
     } else {
       // Fallback to plain text with basic formatting
       console.warn('marked library not loaded, using fallback rendering');
@@ -1838,8 +1850,9 @@ function viewFullSummary(index) {
     qaSidebar.removeAttribute('hidden');
     qaResizer.style.display = '';
     qaResizer.removeAttribute('hidden');
-    const width = savedQaW ? parseInt(savedQaW, 10) : Math.round(window.innerWidth * 0.35);
-    split.style.setProperty('--qa-col', Math.max(260, Math.min(width, Math.round(window.innerWidth * 0.6))) + 'px');
+    // Use a fixed width for QA panel (400px default, or saved width)
+    const width = savedQaW ? parseInt(savedQaW, 10) : 400;
+    split.style.setProperty('--qa-col', Math.max(260, Math.min(width, 600)) + 'px');
     split.style.setProperty('--qa-resizer-col', '6px');
     localStorage.setItem('ui.qaOpen', 'true');
     setTimeout(() => document.getElementById('qaInput')?.focus(), 0);
