@@ -87,8 +87,20 @@
 
         window.electronAPI.onUpdateProgress((progress) => {
           updateMsg.style.display = 'block';
-          updateMsg.textContent = `Downloading update: ${Math.floor(progress.percent)}%`;
-          bar.style.width = Math.min(90, Math.floor(progress.percent)) + '%';
+          // Prefer enhanced detail fields if present
+          const pct = Math.floor(progress.percent || 0);
+          let line = `Downloading update: ${pct}%`;
+          if (progress.transferredMB != null && progress.totalMB != null) {
+            line += ` (${progress.transferredMB}/${progress.totalMB} MB)`;
+          }
+          if (progress.speedMBps != null) {
+            line += ` @ ${progress.speedMBps} MB/s`;
+          }
+            if (progress.etaHuman && progress.percent < 100) {
+            line += ` • ETA ${progress.etaHuman}`;
+          }
+          updateMsg.textContent = line;
+          bar.style.width = Math.min(90, pct) + '%';
         });
 
         window.electronAPI.onUpdateDownloaded((info) => {

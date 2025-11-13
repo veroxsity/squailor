@@ -54,7 +54,7 @@ This checklist tracks high-impact fixes, hardening, and quality upgrades across 
 
 - [x] (T22) Add ESLint + Prettier, wire to prebuild
 - [x] (T10) Add Jest tests for encryption, hashing, parsing, and chunking
-- [ ] (T24) Evaluate enabling `asar`; add `extraResources`/`asarUnpack` if needed
+- [x] (T24) Evaluate enabling `asar`; add `extraResources`/`asarUnpack` if needed
 - [ ] Ensure scripts/verify-deps stays green (npm audit high/critical = fail)
 
 ## Documentation

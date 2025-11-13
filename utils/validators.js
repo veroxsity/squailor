@@ -70,6 +70,7 @@ function sanitizeSettings(input) {
   if (!isValidProvider(out.aiProvider)) delete out.aiProvider;
   if (out.aiModel) out.aiModel = sanitizeModel(out.aiModel);
   if (out.processImages !== undefined) out.processImages = sanitizeBoolean(out.processImages, true);
+  if (out.autoApplyUpdates !== undefined) out.autoApplyUpdates = sanitizeBoolean(out.autoApplyUpdates, true);
 
   if (out.maxImageCount !== undefined) {
     const n = Number(out.maxImageCount);

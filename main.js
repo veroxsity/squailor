@@ -19,6 +19,47 @@ let extractPdfImages;
 
 // Updater resilience helpers
 let autoUpdaterListenersAttached = false;
+// Track timing for enhanced download progress metrics
+let updateDownloadStartTs = null;
+let lastProgressTs = null;
+let updateSlowEmitted = false;
+let slowWatchInterval = null;
+const UPDATE_SLOW_THRESHOLD_MS = 20000; // configurable threshold
+function startUpdateSlowWatch(autoUpdater) {
+  try {
+    if (slowWatchInterval) clearInterval(slowWatchInterval);
+    updateSlowEmitted = false;
+    slowWatchInterval = setInterval(() => {
+      try {
+        if (updateSlowEmitted) return;
+        // If we haven't started downloading yet skip
+        if (!updateDownloadStartTs) return;
+        // If update already downloaded stop
+        // We'll rely on update-downloaded event to clear interval; still guard
+        const now = Date.now();
+        const sinceLastProgress = lastProgressTs ? (now - lastProgressTs) : (now - updateDownloadStartTs);
+        if (sinceLastProgress >= UPDATE_SLOW_THRESHOLD_MS) {
+          updateSlowEmitted = true;
+          try { logStartup('update-slow:' + sinceLastProgress); } catch (_) {}
+          safeSend(mainWindow, 'update-slow', { stalledMs: sinceLastProgress, thresholdMs: UPDATE_SLOW_THRESHOLD_MS });
+          safeSend(splashWindow, 'update-slow', { stalledMs: sinceLastProgress, thresholdMs: UPDATE_SLOW_THRESHOLD_MS });
+        }
+      } catch (_) { /* ignore */ }
+    }, 2500);
+  } catch (_) { /* ignore */ }
+}
+function clearUpdateSlowWatch() {
+  try { if (slowWatchInterval) clearInterval(slowWatchInterval); } catch (_) {}
+  slowWatchInterval = null;
+}
+function formatEta(seconds) {
+  if (seconds == null || !isFinite(seconds)) return '∞';
+  if (seconds < 1) return '<1s';
+  if (seconds < 60) return Math.round(seconds) + 's';
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return m + 'm ' + (s < 10 ? ('0' + s) : s) + 's';
+}
 function scheduleSplashClose(minDelay = MIN_SPLASH_TIME) {
   try {
     if (!splashWindow || splashWindow.isDestroyed && splashWindow.isDestroyed()) return;
@@ -46,25 +87,59 @@ function attachAutoUpdaterListeners(autoUpdater, log) {
   autoUpdater.on('update-available', (info) => {
     safeSend(mainWindow, 'update-available', info);
     safeSend(splashWindow, 'update-available', info);
+    try { logStartup('update-available-event:' + info.version); } catch (_) {}
+    startUpdateSlowWatch(autoUpdater);
   });
   autoUpdater.on('update-not-available', (info) => {
     safeSend(mainWindow, 'update-not-available', info);
     safeSend(splashWindow, 'update-not-available', info);
     // Ensure splash goes away promptly if no update
     scheduleSplashClose();
+    clearUpdateSlowWatch();
   });
   autoUpdater.on('error', (err) => {
     safeSend(mainWindow, 'update-error', { message: err && err.message });
     safeSend(splashWindow, 'update-error', { message: err && err.message });
     scheduleSplashClose();
+    clearUpdateSlowWatch();
   });
   autoUpdater.on('download-progress', (progress) => {
-    safeSend(mainWindow, 'update-progress', progress);
-    safeSend(splashWindow, 'update-progress', progress);
+    try {
+      const now = Date.now();
+      if (!updateDownloadStartTs) updateDownloadStartTs = now;
+      const elapsedMs = now - updateDownloadStartTs;
+      const elapsedSec = elapsedMs / 1000;
+      // electron-updater provides bytesPerSecond, percent, transferred, total
+      const bytesPerSecond = progress.bytesPerSecond || (elapsedSec > 0 ? (progress.transferred / elapsedSec) : 0);
+      const remainingBytes = (progress.total || 0) - (progress.transferred || 0);
+      const etaSec = bytesPerSecond > 0 ? (remainingBytes / bytesPerSecond) : null;
+      const transferredMB = (progress.transferred || 0) / (1024 * 1024);
+      const totalMB = (progress.total || 0) / (1024 * 1024);
+      const speedMBps = bytesPerSecond / (1024 * 1024);
+      const detail = {
+        ...progress,
+        elapsedSeconds: elapsedSec,
+        speedBytesPerSecond: Math.round(bytesPerSecond),
+        speedMBps: Number(speedMBps.toFixed(2)),
+        transferredMB: Number(transferredMB.toFixed(2)),
+        totalMB: Number(totalMB.toFixed(2)),
+        etaSeconds: etaSec == null ? null : Number(etaSec.toFixed(1)),
+        etaHuman: formatEta(etaSec),
+        phase: 'downloading'
+      };
+      lastProgressTs = now;
+      safeSend(mainWindow, 'update-progress', detail); // backward-compatible channel augmented with detail
+      safeSend(splashWindow, 'update-progress', detail);
+    } catch (e) {
+      // Fallback: send original progress if enhancement fails
+      safeSend(mainWindow, 'update-progress', progress);
+      safeSend(splashWindow, 'update-progress', progress);
+    }
   });
   autoUpdater.on('update-downloaded', (info) => {
     safeSend(mainWindow, 'update-downloaded', info);
     safeSend(splashWindow, 'update-downloaded', info);
+    clearUpdateSlowWatch();
   });
 }
 
@@ -303,7 +378,9 @@ const defaultSettings = {
   // Whether to include images (OCR/vision) in processing
   processImages: true,
   // Max number of files to combine into a single summary (user configurable)
-  maxCombinedFiles: 3
+  maxCombinedFiles: 3,
+  // Whether to auto-apply downloaded updates (silent install)
+  autoApplyUpdates: true
 };
 
 // Auto-detect storage location based on where data folder exists
@@ -1804,6 +1881,19 @@ ipcMain.handle('change-storage-location', async (event, storageLocation) => {
 
     try {
       const entries = await fs.readdir(oldDocsPath, { withFileTypes: true });
+      // Pre-migration inventory for integrity check
+      const inventory = [];
+      for (const entry of entries) {
+        const source = path.join(oldDocsPath, entry.name);
+        let size = 0;
+        try {
+          const stat = await fs.stat(source);
+          size = stat.size || 0;
+        } catch (_) { /* ignore */ }
+        inventory.push({ name: entry.name, isDir: entry.isDirectory(), size });
+      }
+      const totalBytes = inventory.reduce((sum, i) => sum + i.size, 0);
+      let migratedBytes = 0;
       for (const entry of entries) {
         const source = path.join(oldDocsPath, entry.name);
         const dest = path.join(newDocumentsPath, entry.name);
@@ -1813,22 +1903,34 @@ ipcMain.handle('change-storage-location', async (event, storageLocation) => {
           } else {
             await fs.copyFile(source, dest);
           }
+          try {
+            const stat = await fs.stat(dest);
+            migratedBytes += stat.size || 0;
+          } catch (_) { /* ignore size tracking errors */ }
         } catch (err) {
           copyErrors.push({ item: entry.name, error: err.message });
         }
       }
+      // Integrity assessment
+      const integrity = {
+        itemsAttempted: inventory.length,
+        itemsFailed: copyErrors.length,
+        totalBytes,
+        migratedBytes,
+        byteRatio: totalBytes ? (migratedBytes / totalBytes) : 1
+      };
 
       // Copy settings if present
       await fs.copyFile(oldSettingsPath, newSettingsPath).catch(() => {});
       // Copy keystore if present
       await fs.copyFile(oldKeystorePath, newKeystorePath).catch(() => {});
 
-      // Only remove old data if all copies succeeded
-      if (copyErrors.length === 0) {
+      // Only remove old data if all copies succeeded (full integrity)
+      if (copyErrors.length === 0 && integrity.byteRatio >= 0.999) {
         await fs.rm(oldDocsPath, { recursive: true, force: true }).catch(() => {});
         await fs.rm(oldDataPath, { recursive: true, force: true }).catch(() => {});
       } else {
-        console.warn('Storage migration completed with errors; old data retained for safety:', copyErrors);
+        console.warn('Storage migration completed with partial integrity; old data retained.', { copyErrors, integrity });
       }
     } catch (err) {
       console.warn('Storage migration: old documents path inaccessible or empty:', err.message);
@@ -2178,6 +2280,115 @@ ipcMain.handle('install-update', async (event, restartImmediately = true) => {
   }
 });
 
+// Manual direct installer download (fallback path)
+ipcMain.handle('manual-download-update', async () => {
+  try {
+    const https = require('https');
+    const os = require('os');
+    const crypto = require('crypto');
+    const tmpDir = os.tmpdir();
+    const owner = 'veroxsity';
+    const repo = 'Squailor';
+    // latest.yml location for GitHub provider
+    const latestUrl = `https://github.com/${owner}/${repo}/releases/latest/download/latest.yml`;
+    const latestYmlPath = path.join(tmpDir, `latest-${Date.now()}.yml`);
+    const ymlContent = await new Promise((resolve, reject) => {
+      https.get(latestUrl, (res) => {
+        if (res.statusCode !== 200) {
+          return reject(new Error('Failed to fetch latest.yml: ' + res.statusCode));
+        }
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => data += chunk);
+        res.on('end', () => resolve(data));
+      }).on('error', reject);
+    });
+    await fs.writeFile(latestYmlPath, ymlContent, 'utf8').catch(()=>{});
+    // Parse version, path (exe) and sha512
+    const versionMatch = ymlContent.match(/^version:\s*([\w.-]+)/m);
+    const pathMatch = ymlContent.match(/^path:\s*(.+\.exe)$/m);
+    // Look for sha512 near path line or global sha512
+    let sha512Match = null;
+    const shaLines = ymlContent.match(/^sha512:\s*([A-Za-z0-9+/=]+)$/mg);
+    if (shaLines && shaLines.length) {
+      sha512Match = shaLines[0].match(/^sha512:\s*([A-Za-z0-9+/=]+)$/);
+    }
+    if (!versionMatch || !pathMatch || !sha512Match) {
+      return { success: false, error: 'latest.yml parse failed (missing version/path/sha512)' };
+    }
+    const version = versionMatch[1].trim();
+    const exeFileName = pathMatch[1].trim();
+    const expectedSha512 = sha512Match[1].trim();
+    const downloadUrl = `https://github.com/${owner}/${repo}/releases/download/v${version}/${encodeURIComponent(exeFileName)}`;
+    // Prepare temp file path
+    const outPath = path.join(tmpDir, exeFileName);
+    const hash = crypto.createHash('sha512');
+    let transferred = 0;
+    let total = 0; // might not be known upfront
+    const startedAt = Date.now();
+    await new Promise((resolve, reject) => {
+      https.get(downloadUrl, (res) => {
+        if (res.statusCode !== 200) {
+          safeSend(mainWindow, 'manual-update-error', { message: 'Installer download failed: ' + res.statusCode });
+          return reject(new Error('HTTP ' + res.statusCode));
+        }
+        total = parseInt(res.headers['content-length'] || '0', 10) || 0;
+        const fileStream = require('fs').createWriteStream(outPath);
+        res.on('data', chunk => {
+          hash.update(chunk);
+          transferred += chunk.length;
+          fileStream.write(chunk);
+          const elapsed = (Date.now() - startedAt)/1000;
+          const speed = elapsed > 0 ? transferred/elapsed : 0;
+          const percent = total > 0 ? (transferred/total)*100 : null;
+          safeSend(mainWindow, 'manual-update-progress', {
+            transferred,
+            total,
+            percent,
+            speedBytesPerSecond: Math.round(speed),
+            speedMBps: Number((speed/1024/1024).toFixed(2)),
+            transferredMB: Number((transferred/1024/1024).toFixed(2)),
+            totalMB: total ? Number((total/1024/1024).toFixed(2)) : null,
+            elapsedSeconds: Number(elapsed.toFixed(1)),
+            phase: 'downloading'
+          });
+        });
+        res.on('end', () => {
+          fileStream.end();
+          resolve();
+        });
+        res.on('error', (e) => {
+          safeSend(mainWindow, 'manual-update-error', { message: e.message });
+          reject(e);
+        });
+      }).on('error', (e) => {
+        safeSend(mainWindow, 'manual-update-error', { message: e.message });
+        reject(e);
+      });
+    });
+    const actualSha512 = hash.digest('base64');
+    if (actualSha512 !== expectedSha512) {
+      safeSend(mainWindow, 'manual-update-verify-failed', { expected: expectedSha512, actual: actualSha512 });
+      return { success: false, error: 'SHA512 mismatch' };
+    }
+    safeSend(mainWindow, 'manual-update-complete', { path: outPath, version });
+    // Install: destroy windows, spawn installer, exit
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.destroy();
+      const { spawn } = require('child_process');
+      const child = spawn(outPath, [], { detached: true, stdio: 'ignore' });
+      child.unref();
+      setTimeout(() => { try { app.quit(); } catch(_){}; setTimeout(()=>{ try { process.exit(0); } catch(_){} }, 1200); }, 400);
+    } catch (e) {
+      safeSend(mainWindow, 'manual-update-error', { message: 'Installer launch failed: ' + e.message });
+      return { success: false, error: e.message };
+    }
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err && err.message };
+  }
+});
+
 // Q&A: answer a question about a stored summary (by folderId)
 ipcMain.handle('qa-summary', async (event, { folderId, question, apiKey, model }) => {
   try {
@@ -2260,6 +2471,41 @@ ipcMain.handle('get-network-diagnostics', async () => {
       success: true,
       suspiciousHosts: suspicious,
       count: suspicious.length
+    };
+  } catch (e) {
+    return { success: false, error: e && e.message };
+  }
+});
+
+// Fetch latest release metadata (version/path/sha512) without downloading installer
+ipcMain.handle('get-latest-release-info', async () => {
+  try {
+    const https = require('https');
+    const owner = 'veroxsity';
+    const repo = 'Squailor';
+    const latestUrl = `https://github.com/${owner}/${repo}/releases/latest/download/latest.yml`;
+    const data = await new Promise((resolve, reject) => {
+      https.get(latestUrl, (res) => {
+        if (res.statusCode !== 200) return reject(new Error('Failed latest.yml fetch: ' + res.statusCode));
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', chunk => body += chunk);
+        res.on('end', () => resolve(body));
+      }).on('error', reject);
+    });
+    const versionMatch = data.match(/^version:\s*([\w.-]+)/m);
+    const pathMatch = data.match(/^path:\s*(.+\.exe)$/m);
+    const shaLines = data.match(/^sha512:\s*([A-Za-z0-9+/=]+)$/mg);
+    let sha512 = null;
+    if (shaLines && shaLines.length) {
+      const m = shaLines[0].match(/^sha512:\s*([A-Za-z0-9+/=]+)$/);
+      if (m) sha512 = m[1];
+    }
+    return {
+      success: true,
+      version: versionMatch ? versionMatch[1].trim() : null,
+      exePath: pathMatch ? pathMatch[1].trim() : null,
+      sha512
     };
   } catch (e) {
     return { success: false, error: e && e.message };

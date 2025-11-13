@@ -560,7 +560,7 @@
                       <div class="card-icon">⬆️</div>
                       <div>
                         <h3>Updates</h3>
-                        <p>Check for the latest Squailor release.</p>
+                        <p>Manage application updates and installation behavior.</p>
                       </div>
                     </header>
                     <div class="card-body">
@@ -568,6 +568,18 @@
                         <button id="checkUpdatesBtn" class="btn btn-primary">Check for updates</button>
                         <button id="installUpdateBtn" class="btn btn-success" hidden>Restart & install</button>
                         <span id="updateStatus" class="status-inline"></span>
+                      </div>
+                      <div class="update-info" style="margin-top:12px;display:grid;gap:6px;font-size:13px;">
+                        <div><strong>Current version:</strong> <span id="currentVersionValue">Loading...</span></div>
+                        <div><strong>Latest available:</strong> <span id="latestVersionValue">—</span></div>
+                        <label class="setting-toggle" style="display:flex;align-items:center;gap:6px;margin-top:4px;">
+                          <input type="checkbox" id="autoApplyUpdatesToggle">
+                          <span>Auto-apply downloaded updates</span>
+                        </label>
+                        <div id="updateProgressDetails" style="color:#64748b;min-height:16px;font-size:12px;"></div>
+                        <div class="manual-download-row" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;">
+                          <button id="manualDownloadBtn" class="btn btn-outline btn-small">Manual download</button>
+                        </div>
                       </div>
                     </div>
                   </article>

@@ -18,29 +18,72 @@ async function validate({ apiKey, endpoint, deployment, apiVersion } = {}) {
   }
 }
 
-async function chat({ client, model, messages, temperature = 0.3, maxTokens = 3000 /*, stream = false*/ }) {
+async function chat({ client, model, messages, temperature = 0.3, maxTokens = 3000, stream = false, onDelta }) {
   try {
     const url = `${client.url}?api-version=${encodeURIComponent(client.apiVersion)}`;
     const body = {
       messages,
       temperature,
-      max_tokens: maxTokens
+      max_tokens: maxTokens,
+      stream: !!stream
     };
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'api-key': client.apiKey
+    };
+
     const resp = await fetch(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'api-key': client.apiKey
-      },
+      headers,
       body: JSON.stringify(body)
     });
+
     if (!resp.ok) {
       const text = await resp.text();
       throw new Error(`${resp.status} ${resp.statusText}: ${text}`);
     }
-    const data = await resp.json();
-    const out = data?.choices?.[0]?.message?.content || '';
-    return (out || '').trim();
+
+    if (stream) {
+      // Azure returns an SSE stream; manually parse line-oriented chunks
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let full = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        // Process complete lines
+        const lines = buffer.split(/\r?\n/);
+        buffer = lines.pop(); // keep last partial
+        for (const line of lines) {
+          const trimmed = line.trim();
+            if (!trimmed) continue;
+          if (trimmed.startsWith('data:')) {
+            const payload = trimmed.slice(5).trim();
+            if (payload === '[DONE]') {
+              return full.trim();
+            }
+            try {
+              const json = JSON.parse(payload);
+              const delta = json?.choices?.[0]?.delta?.content || json?.choices?.[0]?.message?.content || '';
+              if (delta) {
+                full += delta;
+                if (typeof onDelta === 'function') onDelta(delta);
+              }
+            } catch (_) {
+              // ignore malformed line
+            }
+          }
+        }
+      }
+      return full.trim();
+    } else {
+      const data = await resp.json();
+      const out = data?.choices?.[0]?.message?.content || '';
+      return (out || '').trim();
+    }
   } catch (e) {
     const n = normalizeError(e);
     const prefix = n.code === 'RATE_LIMIT' ? 'RATE_LIMIT:' : n.code === 'QUOTA_EXCEEDED' ? 'QUOTA_EXCEEDED:' : n.code === 'INVALID_API_KEY' ? 'INVALID_API_KEY:' : '';

@@ -849,6 +849,11 @@ async function loadStorageSettings() {
 const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
 const installUpdateBtn = document.getElementById('installUpdateBtn');
 const updateStatusDiv = document.getElementById('updateStatus');
+const currentVersionValue = document.getElementById('currentVersionValue');
+const latestVersionValue = document.getElementById('latestVersionValue');
+const autoApplyUpdatesToggle = document.getElementById('autoApplyUpdatesToggle');
+const updateProgressDetails = document.getElementById('updateProgressDetails');
+const manualDownloadBtn = document.getElementById('manualDownloadBtn');
 
 if (checkUpdatesBtn) {
   checkUpdatesBtn.addEventListener('click', async () => {
@@ -890,15 +895,36 @@ if (window.electronAPI && window.electronAPI.onUpdateChecking) {
   window.electronAPI.onUpdateAvailable((info) => {
     if (updateStatusDiv) updateStatusDiv.textContent = `Update available: ${info.version} — downloading...`;
     if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+    if (latestVersionValue) latestVersionValue.textContent = info.version;
   });
 
   window.electronAPI.onUpdateProgress((progress) => {
-    if (updateStatusDiv) updateStatusDiv.textContent = `Downloading update: ${Math.round(progress.percent || 0)}% (${progress.bytesPerSecond ? (Math.round(progress.bytesPerSecond / 1024) + ' KB/s') : ''})`;
+    if (updateStatusDiv) updateStatusDiv.textContent = `Downloading update: ${Math.round(progress.percent || 0)}%`;
+    if (updateProgressDetails) {
+      let line = '';
+      if (progress.transferredMB != null && progress.totalMB != null) {
+        line += `${progress.transferredMB}/${progress.totalMB} MB`;
+      }
+      if (progress.speedMBps != null) {
+        line += (line ? ' • ' : '') + `${progress.speedMBps} MB/s`;
+      }
+      if (progress.etaHuman && progress.percent < 100) {
+        line += (line ? ' • ' : '') + `ETA ${progress.etaHuman}`;
+      }
+      updateProgressDetails.textContent = line;
+    }
   });
 
   window.electronAPI.onUpdateDownloaded((info) => {
     if (updateStatusDiv) updateStatusDiv.textContent = `Update downloaded: ${info.version}`;
     if (installUpdateBtn) installUpdateBtn.style.display = 'inline-block';
+    // Auto apply if setting enabled
+    try {
+      if (autoApplyUpdatesToggle && autoApplyUpdatesToggle.checked) {
+        updateStatusDiv.textContent = 'Applying update...';
+        window.electronAPI.installUpdate(true);
+      }
+    } catch (e) { console.error('Auto-apply failed', e); }
   });
 
   window.electronAPI.onUpdateNotAvailable(() => {
@@ -909,6 +935,193 @@ if (window.electronAPI && window.electronAPI.onUpdateChecking) {
   window.electronAPI.onUpdateError((err) => {
     if (updateStatusDiv) updateStatusDiv.textContent = `Update error: ${err && err.message}`;
     if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+  });
+
+  // Fallback: stalled download detection
+  window.electronAPI.onUpdateSlow((detail) => {
+    try {
+      if (updateStatusDiv) updateStatusDiv.textContent = 'Download appears stalled — offering fallback options.';
+      // Create banner if not present
+      let banner = document.getElementById('updateSlowBanner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'updateSlowBanner';
+        banner.style.position = 'fixed';
+        banner.style.bottom = '16px';
+        banner.style.right = '16px';
+        banner.style.zIndex = '9999';
+        banner.style.maxWidth = '360px';
+        banner.style.background = 'linear-gradient(135deg,#1e293b,#0f172a)';
+        banner.style.color = '#f1f5f9';
+        banner.style.padding = '14px 16px';
+        banner.style.borderRadius = '10px';
+        banner.style.boxShadow = '0 4px 16px rgba(0,0,0,0.45)';
+        banner.style.fontSize = '13px';
+        banner.style.lineHeight = '1.4';
+        banner.innerHTML = `
+          <div style="font-weight:600;margin-bottom:6px;">Update download stalled</div>
+          <div style="opacity:.85;margin-bottom:10px;">No progress for ${(detail.stalledMs/1000).toFixed(0)}s. You can retry or use fallback options.</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button id="updateRetryBtn" style="flex:1 1 auto;padding:6px 10px;border:none;border-radius:6px;background:#3b82f6;color:#fff;cursor:pointer;">Retry</button>
+            <button id="updateManualBtn" style="flex:1 1 auto;padding:6px 10px;border:none;border-radius:6px;background:#64748b;color:#fff;cursor:pointer;">Manual</button>
+            <button id="updateDismissBtn" style="flex:0 1 auto;padding:6px 10px;border:none;border-radius:6px;background:#334155;color:#fff;cursor:pointer;">Dismiss</button>
+          </div>
+        `;
+        document.body.appendChild(banner);
+        // Wire actions
+        const retryBtn = document.getElementById('updateRetryBtn');
+        const manualBtn = document.getElementById('updateManualBtn');
+        const dismissBtn = document.getElementById('updateDismissBtn');
+        if (retryBtn) retryBtn.addEventListener('click', async () => {
+          try { updateStatusDiv && (updateStatusDiv.textContent = 'Retrying update check...'); } catch(_){}
+          try { await window.electronAPI.checkForUpdates(); } catch(e){ console.error('Retry failed', e); }
+        });
+        if (manualBtn) manualBtn.addEventListener('click', async () => {
+          manualBtn.disabled = true;
+          manualBtn.textContent = 'Starting...';
+          try {
+            await window.electronAPI.manualDownloadUpdate();
+          } catch (e) {
+            console.error('Manual download start failed', e);
+            manualBtn.disabled = false;
+            manualBtn.textContent = 'Manual';
+          }
+        });
+        if (dismissBtn) dismissBtn.addEventListener('click', () => {
+          if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+        });
+      }
+    } catch (e) { console.error('Failed to show slow banner', e); }
+  });
+}
+
+// Manual download button separate from stalled banner
+if (manualDownloadBtn) {
+  manualDownloadBtn.addEventListener('click', async () => {
+    manualDownloadBtn.disabled = true;
+    manualDownloadBtn.textContent = 'Starting...';
+    try {
+      await window.electronAPI.manualDownloadUpdate();
+    } catch (e) {
+      manualDownloadBtn.disabled = false;
+      manualDownloadBtn.textContent = 'Manual download';
+    }
+  });
+}
+
+// Manual update progress listeners (panel context as well)
+if (window.electronAPI && window.electronAPI.onManualUpdateProgress) {
+  window.electronAPI.onManualUpdateProgress((data) => {
+    if (updateProgressDetails) {
+      let line = `Manual: ${data.transferredMB} MB`;
+      if (data.totalMB != null) line += ` / ${data.totalMB} MB`;
+      if (data.speedMBps != null) line += ` • ${data.speedMBps} MB/s`;
+      if (data.percent != null) line += ` • ${Math.round(data.percent)}%`;
+      updateProgressDetails.textContent = line;
+    }
+  });
+  window.electronAPI.onManualUpdateVerifyFailed((d) => {
+    if (updateProgressDetails) updateProgressDetails.textContent = 'Integrity check failed';
+    if (manualDownloadBtn) { manualDownloadBtn.disabled = false; manualDownloadBtn.textContent = 'Manual download'; }
+  });
+  window.electronAPI.onManualUpdateError((d) => {
+    if (updateProgressDetails) updateProgressDetails.textContent = 'Manual update error: ' + (d && d.message);
+    if (manualDownloadBtn) { manualDownloadBtn.disabled = false; manualDownloadBtn.textContent = 'Manual download'; }
+  });
+  window.electronAPI.onManualUpdateComplete((d) => {
+    if (updateProgressDetails) updateProgressDetails.textContent = 'Manual download complete. Launching installer...';
+  });
+}
+
+// Load version + latest release & settings toggle state when settings page opens
+async function initUpdateSettingsPanel() {
+  try {
+    if (currentVersionValue) {
+      const v = await window.electronAPI.getAppVersion();
+      currentVersionValue.textContent = v;
+    }
+    if (latestVersionValue) {
+      const meta = await window.electronAPI.getLatestReleaseInfo();
+      if (meta && meta.success && meta.version) latestVersionValue.textContent = meta.version; else latestVersionValue.textContent = '—';
+    }
+    const settings = await window.electronAPI.getSettings();
+    if (autoApplyUpdatesToggle && settings && typeof settings.autoApplyUpdates === 'boolean') {
+      autoApplyUpdatesToggle.checked = settings.autoApplyUpdates;
+    }
+    if (autoApplyUpdatesToggle) {
+      autoApplyUpdatesToggle.addEventListener('change', async () => {
+        const s = await window.electronAPI.getSettings();
+        s.autoApplyUpdates = !!autoApplyUpdatesToggle.checked;
+        await window.electronAPI.saveSettings({ autoApplyUpdates: s.autoApplyUpdates });
+      });
+    }
+  } catch (e) { console.error('Failed update settings init', e); }
+}
+
+// Observe navigation to settings updates panel
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t && t.matches && t.matches('.settings-nav-item[data-panel="updates"]')) {
+    setTimeout(initUpdateSettingsPanel, 50);
+  }
+});
+
+// Manual update progress listeners
+if (window.electronAPI && window.electronAPI.onManualUpdateProgress) {
+  window.electronAPI.onManualUpdateProgress((data) => {
+    let banner = document.getElementById('manualUpdateProgress');
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'manualUpdateProgress';
+      banner.style.position = 'fixed';
+      banner.style.bottom = '16px';
+      banner.style.left = '16px';
+      banner.style.zIndex = '9999';
+      banner.style.background = 'rgba(15,23,42,0.9)';
+      banner.style.color = '#f8fafc';
+      banner.style.padding = '12px 14px';
+      banner.style.borderRadius = '10px';
+      banner.style.fontSize = '13px';
+      banner.style.width = '340px';
+      banner.style.boxShadow = '0 4px 16px rgba(0,0,0,0.5)';
+      banner.innerHTML = '<div style="font-weight:600;margin-bottom:6px;">Manual installer download</div><div id="manualUpdateLine" style="margin-bottom:6px;">Initializing...</div><div style="height:6px;background:#1e293b;border-radius:4px;overflow:hidden"><div id="manualUpdateBar" style="height:100%;width:0%;background:linear-gradient(90deg,#3b82f6,#06b6d4)"></div></div>';
+      document.body.appendChild(banner);
+    }
+    const line = document.getElementById('manualUpdateLine');
+    const bar = document.getElementById('manualUpdateBar');
+    if (line) {
+      let pct = data.percent != null ? Math.round(data.percent) + '%' : ((data.transferredMB || 0) + ' MB');
+      let msg = `Downloading: ${pct}`;
+      if (data.speedMBps != null) msg += ` @ ${data.speedMBps} MB/s`;
+      if (data.totalMB != null) msg += ` (${data.transferredMB}/${data.totalMB} MB)`;
+      line.textContent = msg;
+    }
+    if (bar && data.percent != null) {
+      bar.style.width = Math.min(100, data.percent) + '%';
+    }
+  });
+  window.electronAPI.onManualUpdateVerifyFailed((d) => {
+    const line = document.getElementById('manualUpdateLine');
+    if (line) {
+      line.textContent = 'Integrity check failed (hash mismatch). Aborting.';
+      line.style.color = '#f87171';
+    }
+  });
+  window.electronAPI.onManualUpdateError((d) => {
+    const line = document.getElementById('manualUpdateLine');
+    if (line) {
+      line.textContent = 'Manual update error: ' + (d && d.message);
+      line.style.color = '#f87171';
+    }
+  });
+  window.electronAPI.onManualUpdateComplete((d) => {
+    const line = document.getElementById('manualUpdateLine');
+    if (line) {
+      line.textContent = 'Download complete. Launching installer...';
+      line.style.color = '#10b981';
+    }
+    const bar = document.getElementById('manualUpdateBar');
+    if (bar) bar.style.width = '100%';
   });
 }
 
