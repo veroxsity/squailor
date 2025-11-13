@@ -41,3 +41,5 @@ premium-plan/
 
 # Workspace settings
 Squailor.code-workspace
+
+__tests__/

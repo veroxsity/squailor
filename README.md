@@ -61,6 +61,8 @@ Squailor is a desktop application that reads your PDFs, PowerPoint presentations
 - **Zero telemetry:** Squailor does not track usage or send analytics
 - **Portable mode:** Run from a USB drive with all data self-contained
 - **No vendor lock-in:** Switch between AI providers anytime without losing your data
+- **HTML sanitization:** AI-generated Markdown is sanitized with DOMPurify before rendering to prevent XSS
+- **Content Security Policy:** A strict CSP is enabled to restrict scripts/styles and further reduce attack surface
 
 ### 🎨 Modern UI
 
@@ -347,7 +349,7 @@ See [`documentation/SUGGESTIONS.md`](documentation/SUGGESTIONS.md) for a curated
 ### Architecture Overview
 
 - **Electron app:** Main process (`main.js`), renderer (`renderer.js`), preload bridge (`preload.js`)
-- **Parser utilities:** `utils/pdfParser.js`, `utils/pptxParser.js`, `utils/docxParser.js`, `utils/pdfImages.js`
+- **Parser utilities:** PDF text via `pdf-parse-fork`; PowerPoint via `utils/pptxParser.js`; Word via `utils/docxParser.js`; PDF thumbnails via `utils/pdfImages.js`
 - **AI integration:** `utils/aiSummarizer.js` (OpenRouter client with streaming support)
 - **Security:** `utils/encryption.js` (AES-256 for API key storage), `utils/fileHash.js` (SHA-256 for duplicate detection)
 - **Storage:** Per-document folder structure under `data/documents/`, each with `summary.json` and original file

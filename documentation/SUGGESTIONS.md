@@ -43,10 +43,10 @@
 
 **Example Test Structure:**
 ```javascript
-// tests/utils/pdfParser.test.js
-describe('PDF Parser', () => {
+// __tests__/pdfParsing.test.js
+describe('PDF parsing', () => {
   test('should extract text from valid PDF', async () => {
-    const result = await parsePDF('test-data/sample.pdf');
+    const result = await parsePDF('test-data/sample.pdf'); // using pdf-parse-fork under the hood
     expect(result.text).toBeTruthy();
     expect(result.text.length).toBeGreaterThan(0);
   });

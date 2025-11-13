@@ -277,9 +277,10 @@ ${text}`;
   }
 
   try {
-  // Split text into chunks if it's too long (GPT has token limits)
-  const maxChunkSize = summaryType === 'longer' ? 24000 : 12000; // Larger chunks for longer mode
-    const chunks = splitTextIntoChunks(text, maxChunkSize);
+  // Split text into chunks using an approximate token budget per chunk
+  const approxTokens = estimateTokens(text);
+  const targetChunkTokens = summaryType === 'longer' ? 3500 : (summaryType === 'short' ? 900 : 2200);
+  const chunks = splitTextIntoChunksByTokens(text, targetChunkTokens);
 
     if (chunks.length === 1) {
       // Single chunk - process normally
@@ -445,55 +446,99 @@ ${chunkSummaries.map((s, i) => `Part ${i + 1}:\n${s}`).join('\n\n')}`;
  * @param {number} maxSize - Maximum size of each chunk
  * @returns {Array<string>} - Array of text chunks
  */
-function splitTextIntoChunks(text, maxSize) {
-  if (text.length <= maxSize) {
-    return [text];
-  }
+function estimateTokens(text) {
+  // Simple heuristic: ~4 chars per token on average English
+  // Clamp to at least number of words to avoid underestimation on short strings
+  const byChars = Math.ceil(text.length / 4);
+  const byWords = Math.max(1, (text.match(/\S+/g) || []).length);
+  return Math.max(byChars, byWords);
+}
+
+function splitTextIntoChunksByTokens(text, targetTokens) {
+  // If under budget, return as single chunk
+  if (estimateTokens(text) <= targetTokens) return [text];
 
   const chunks = [];
   const paragraphs = text.split(/\n\n+/);
-  let currentChunk = '';
+  let current = '';
+  let currentTokens = 0;
 
-  for (const paragraph of paragraphs) {
-    if (currentChunk.length + paragraph.length + 2 <= maxSize) {
-      currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
-    } else {
-      if (currentChunk) {
-        chunks.push(currentChunk);
-      }
-      
-      // If a single paragraph is too long, split it by sentences
-      if (paragraph.length > maxSize) {
-        const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
-        let sentenceChunk = '';
-        
-        for (const sentence of sentences) {
-          if (sentenceChunk.length + sentence.length <= maxSize) {
-            sentenceChunk += sentence;
-          } else {
-            if (sentenceChunk) {
-              chunks.push(sentenceChunk);
-            }
-            sentenceChunk = sentence;
-          }
-        }
-        
-        currentChunk = sentenceChunk;
-      } else {
-        currentChunk = paragraph;
-      }
+  function pushCurrent() {
+    if (current) {
+      chunks.push(current);
+      current = '';
+      currentTokens = 0;
     }
   }
 
-  if (currentChunk) {
-    chunks.push(currentChunk);
+  for (const paragraph of paragraphs) {
+    const pTokens = estimateTokens(paragraph);
+    if (currentTokens + pTokens + 10 <= targetTokens) {
+      current += (current ? '\n\n' : '') + paragraph;
+      currentTokens += pTokens + 1;
+    } else if (pTokens > targetTokens) {
+      // Split long paragraph by sentences
+      const sentences = paragraph.match(/[^.!?\n]+[.!?]+\s*/g) || [paragraph];
+      let buff = '';
+      let buffTokens = 0;
+      for (const s of sentences) {
+        const sTok = estimateTokens(s);
+        if (buffTokens + sTok + 1 <= targetTokens) {
+          buff += s;
+          buffTokens += sTok + 1;
+        } else {
+          if (buff) {
+            // Flush sentence buffer into current/chunks respecting budget
+            if (currentTokens + buffTokens <= targetTokens) {
+              current += (current ? '\n\n' : '') + buff;
+              currentTokens += buffTokens;
+            } else {
+              pushCurrent();
+              chunks.push(buff);
+            }
+            buff = '';
+            buffTokens = 0;
+          }
+          if (sTok >= targetTokens) {
+            // Hard split the sentence if extremely long
+            const sliceSize = Math.max(50, Math.floor(targetTokens * 4));
+            for (let i = 0; i < s.length; i += sliceSize) {
+              const piece = s.slice(i, i + sliceSize);
+              if (currentTokens + estimateTokens(piece) > targetTokens) pushCurrent();
+              current += (current ? '\n' : '') + piece;
+              currentTokens += estimateTokens(piece);
+              if (currentTokens >= targetTokens) pushCurrent();
+            }
+          } else {
+            if (currentTokens + sTok > targetTokens) pushCurrent();
+            current += (current ? '\n' : '') + s;
+            currentTokens += sTok;
+          }
+        }
+      }
+      if (buff) {
+        if (currentTokens + buffTokens > targetTokens) pushCurrent();
+        current += (current ? '\n\n' : '') + buff;
+        currentTokens += buffTokens;
+      }
+    } else {
+      // Paragraph fits but would exceed current budget → flush current
+      pushCurrent();
+      current = paragraph;
+      currentTokens = pTokens;
+    }
+
+    if (currentTokens >= targetTokens) pushCurrent();
   }
 
+  pushCurrent();
   return chunks;
 }
 
 module.exports = {
-  summarizeText
+  summarizeText,
+  estimateTokens,
+  splitTextIntoChunksByTokens
 };
 
 /**
@@ -522,8 +567,8 @@ function buildUserMessage(userPrompt, images) {
  * This is best-effort; OpenRouter model naming commonly includes '4o'/'omni'/'vision'
  * You can expand/override this list via settings later.
  */
-function modelSupportsVision(model) {
-  return adapterSupportsVision(model);
+function modelSupportsVision(model, provider) {
+  return adapterSupportsVision(model, provider);
 }
 
 module.exports.modelSupportsVision = modelSupportsVision;

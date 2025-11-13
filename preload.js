@@ -44,10 +44,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-storage-stats'),
   getSummaryHistory: () =>
     ipcRenderer.invoke('get-summary-history'),
-  saveHistory: (history) =>
-    ipcRenderer.invoke('save-history', history),
-  addSummaryToHistory: (summaryData) =>
-    ipcRenderer.invoke('add-summary-to-history', summaryData),
   deleteSummaryFromHistory: (index) =>
     ipcRenderer.invoke('delete-summary-from-history', index),
   clearSummaryHistory: () =>
@@ -68,6 +64,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Q&A about a summary
   askSummaryQuestion: (folderId, question, apiKey, model) => ipcRenderer.invoke('qa-summary', { folderId, question, apiKey, model }),
   onQaProgress: (folderId, callback) => ipcRenderer.on(`qa-progress:${folderId}`, (event, data) => callback(data)),
+  offQaProgress: (folderId) => ipcRenderer.removeAllListeners(`qa-progress:${folderId}`),
   // Get models for a provider
   getProviderModels: (provider) => ipcRenderer.invoke('get-provider-models', provider)
 });

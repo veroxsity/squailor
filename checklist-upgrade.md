@@ -6,14 +6,14 @@ This checklist tracks high-impact fixes, hardening, and quality upgrades across 
 
 ## Security
 
-- [ ] (T4, T14) Sanitize AI-rendered summaries before injecting into the DOM
+- [x] (T4, T14) Sanitize AI-rendered summaries before injecting into the DOM
   - Add DOMPurify (or sanitize-html) and sanitize `marked.parse()` output in `renderer.js`
   - Consider disabling raw HTML in marked; document decision
   - Add a strict CSP in `index.html` and verify the UI still works
-- [ ] (T7) Add strong Content Security Policy in `index.html`
+- [x] (T7) Add strong Content Security Policy in `index.html`
   - Disallow inline scripts or add nonces
   - Verify preload-only scripting works; confirm no eval/Function used
-- [ ] (T13) Validate IPC inputs and preload-exposed API parameters
+- [x] (T13) Validate IPC inputs and preload-exposed API parameters
   - Type-check and guard arrays, strings, enums
   - Return clean error objects without stack traces to the renderer
 - [ ] (T29) Outbound network allowlist and telemetry check
@@ -22,15 +22,15 @@ This checklist tracks high-impact fixes, hardening, and quality upgrades across 
 
 ## Stability and Correctness
 
-- [ ] (T1) Fix undefined `log` usage in `main.js` during blocking update error path
+- [x] (T1) Fix undefined `log` usage in `main.js` during blocking update error path
   - Replace with scoped `electron-log` or `console.warn`
-- [ ] (T3, T17, T23) Fix storage-location migration for folder-based storage
+- [x] (T3, T17, T23) Fix storage-location migration for folder-based storage
   - Implement recursive copy (fs.cp) for `documents/`
   - Replace deprecated `fs.rmdir` with `fs.rm`
   - Add atomicity/rollback notes and better user feedback
-- [ ] (T2) Switch duplicate detection to SHA-256 (docs already claim SHA-256)
+- [x] (T2) Switch duplicate detection to SHA-256 (docs already claim SHA-256)
   - Update `utils/fileHash.js` and validate compatibility
-- [ ] (T6) Remove `originalText` from IPC results to reduce memory/IPC load
+- [x] (T6) Remove `originalText` from IPC results to reduce memory/IPC load
 - [ ] (T16) Audit blocking updater flow vs non-blocking listeners
   - Ensure splash always closes; no double event firing; robust timeout path
 
@@ -47,20 +47,20 @@ This checklist tracks high-impact fixes, hardening, and quality upgrades across 
 - [ ] (T11) Token-aware chunking (replace char-based chunking)
 - [ ] (T12) Model vision capability map by provider (fewer heuristic misses)
 - [ ] (T18) Externalize provider model lists (JSON or on-demand fetch), keep safe fallbacks
-- [ ] (T9) Update OpenRouter referer/headers to actual repo/title
+- [x] (T9) Update OpenRouter referer/headers to actual repo/title
 - [ ] (T28) Consider Azure streaming support (optional)
 
 ## Build, Packaging, Tooling
 
 - [ ] (T22) Add ESLint + Prettier, wire to prebuild
-- [ ] (T10) Add Jest tests for encryption, hashing, parsing, and chunking
+- [x] (T10) Add Jest tests for encryption, hashing, parsing, and chunking
 - [ ] (T24) Evaluate enabling `asar`; add `extraResources`/`asarUnpack` if needed
 - [ ] Ensure scripts/verify-deps stays green (npm audit high/critical = fail)
 
 ## Documentation
 
-- [ ] (T15) Fix README and docs references (e.g., `utils/pdfParser.js` → `utils/pdfImages.js`)
-- [ ] Add a brief Security section covering CSP, sanitization, storage encryption, and network endpoints
+- [x] (T15) Fix README and docs references (e.g., `utils/pdfParser.js` → `utils/pdfImages.js`)
+- [x] Add a brief Security section covering CSP, sanitization, storage encryption, and network endpoints
 
 ---
 

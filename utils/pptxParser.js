@@ -45,16 +45,18 @@ async function parsePresentation(filePath) {
       }
     }
 
-    // Log raw text before cleaning (for debugging)
-    console.log('Raw text before cleaning (length:', rawText.length, ')');
+    // Debug logging (development only)
+    const isDev = process.env.NODE_ENV === 'development';
+    const debugLog = (...args) => { if (isDev) console.log(...args); };
+    debugLog('Raw text before cleaning (length:', rawText.length, ')');
     if (rawText.length > 0 && rawText.length < 500) {
-      console.log('Raw text:', rawText);
+      debugLog('Raw text:', rawText);
     }
 
     // Clean up the extracted text
     text = cleanExtractedText(text);
     
-    console.log('Cleaned text (length:', text.length, ')');
+  debugLog('Cleaned text (length:', text.length, ')');
 
     if (!text || text.trim().length === 0) {
       throw new Error('No text content found in presentation. The slides may be empty or contain only images.');

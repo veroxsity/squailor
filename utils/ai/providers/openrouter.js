@@ -7,8 +7,8 @@ function createClient({ apiKey } = {}) {
     apiKey,
     baseURL: 'https://openrouter.ai/api/v1',
     defaultHeaders: {
-      'HTTP-Referer': 'https://github.com/yourusername/squailor',
-      'X-Title': 'Squailor Document Summarizer'
+      'HTTP-Referer': 'https://github.com/veroxsity/Squailor',
+      'X-Title': 'Squailor'
     }
   });
 }

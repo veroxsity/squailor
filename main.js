@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+const validators = require('./utils/validators');
 // Lazy-loaded heavy modules (required on demand to speed up app startup)
 let pdfParse;
 let parsePresentation;
@@ -15,6 +16,57 @@ let decrypt;
 let validateEncryption;
 let calculateFileHash;
 let extractPdfImages;
+
+// Updater resilience helpers
+let autoUpdaterListenersAttached = false;
+function scheduleSplashClose(minDelay = MIN_SPLASH_TIME) {
+  try {
+    if (!splashWindow || splashWindow.isDestroyed && splashWindow.isDestroyed()) return;
+    const elapsed = Date.now() - splashShownAt;
+    const delay = Math.max(0, minDelay - elapsed);
+    setTimeout(() => {
+      try {
+        if (splashWindow && !splashWindow.isDestroyed()) {
+          splashWindow.close();
+        }
+      } catch (_) {}
+    }, delay);
+  } catch (_) {}
+}
+
+function attachAutoUpdaterListeners(autoUpdater, log) {
+  if (autoUpdaterListenersAttached) return;
+  autoUpdaterListenersAttached = true;
+  try { logStartup('autoUpdaterListenersAttached'); } catch (_) {}
+
+  autoUpdater.on('checking-for-update', () => {
+    safeSend(mainWindow, 'update-checking');
+    safeSend(splashWindow, 'update-checking');
+  });
+  autoUpdater.on('update-available', (info) => {
+    safeSend(mainWindow, 'update-available', info);
+    safeSend(splashWindow, 'update-available', info);
+  });
+  autoUpdater.on('update-not-available', (info) => {
+    safeSend(mainWindow, 'update-not-available', info);
+    safeSend(splashWindow, 'update-not-available', info);
+    // Ensure splash goes away promptly if no update
+    scheduleSplashClose();
+  });
+  autoUpdater.on('error', (err) => {
+    safeSend(mainWindow, 'update-error', { message: err && err.message });
+    safeSend(splashWindow, 'update-error', { message: err && err.message });
+    scheduleSplashClose();
+  });
+  autoUpdater.on('download-progress', (progress) => {
+    safeSend(mainWindow, 'update-progress', progress);
+    safeSend(splashWindow, 'update-progress', progress);
+  });
+  autoUpdater.on('update-downloaded', (info) => {
+    safeSend(mainWindow, 'update-downloaded', info);
+    safeSend(splashWindow, 'update-downloaded', info);
+  });
+}
 
 let mainWindow;
 let splashWindow;
@@ -151,6 +203,8 @@ async function runBlockingUpdateCheck(timeoutMs = 15000) {
         log.info('Blocking flow - update not available');
         try { logStartup('update-not-available'); } catch (e) {}
         safeSend(splashWindow, 'update-not-available', info);
+        // Schedule splash close and allow app start
+        scheduleSplashClose();
         finish(true);
       });
 
@@ -158,6 +212,7 @@ async function runBlockingUpdateCheck(timeoutMs = 15000) {
         log.warn('Blocking flow - update error:', err == null ? 'unknown' : (err.stack || err).toString());
         try { logStartup('update-error:' + (err && err.message)); } catch (e) {}
         safeSend(splashWindow, 'update-error', { message: err && err.message });
+        scheduleSplashClose();
         finish(true);
       });
 
@@ -600,43 +655,19 @@ app.whenReady().then(async () => {
       autoUpdater.logger.transports.file.level = 'info';
       autoUpdater.autoDownload = true; // set to false if you prefer manual download
 
-      autoUpdater.on('checking-for-update', () => {
-        log.info('Checking for update...');
-        safeSend(mainWindow, 'update-checking');
-        safeSend(splashWindow, 'update-checking');
-      });
+      // Attach resilient listeners once
+      attachAutoUpdaterListeners(autoUpdater, log);
 
-      autoUpdater.on('update-available', (info) => {
-        log.info('Update available:', info.version);
-        safeSend(mainWindow, 'update-available', info);
-        safeSend(splashWindow, 'update-available', info);
-      });
+      // Network reachability diagnostic (non-blocking)
+      try {
+        const dns = require('dns');
+        dns.resolve('github.com', (err) => {
+          try { logStartup('dnsCheck:' + (err ? ('fail:' + err.code) : 'ok')); } catch (_) {}
+        });
+      } catch (_) {}
 
-      autoUpdater.on('update-not-available', (info) => {
-        log.info('Update not available');
-        safeSend(mainWindow, 'update-not-available', info);
-        safeSend(splashWindow, 'update-not-available', info);
-      });
-
-      autoUpdater.on('error', (err) => {
-        log.warn('Update error:', err == null ? 'unknown' : (err.stack || err).toString());
-        safeSend(mainWindow, 'update-error', { message: err && err.message });
-        safeSend(splashWindow, 'update-error', { message: err && err.message });
-      });
-
-      autoUpdater.on('download-progress', (progress) => {
-        safeSend(mainWindow, 'update-progress', progress);
-        safeSend(splashWindow, 'update-progress', progress);
-      });
-
-      autoUpdater.on('update-downloaded', (info) => {
-        log.info('Update downloaded:', info.version);
-        safeSend(mainWindow, 'update-downloaded', info);
-        safeSend(splashWindow, 'update-downloaded', info);
-        // Let the renderer prompt the user; renderer can call ipc to trigger quitAndInstall
-      });
-
-      // Blocking update check is defined at top-level (runBlockingUpdateCheck)
+      // If no update events change splash after 20s, ensure splash closes
+      setTimeout(() => scheduleSplashClose(), 20000);
     }
   } catch (e) {
     console.warn('auto-updater not available in this environment', e && e.message);
@@ -670,13 +701,19 @@ ipcMain.handle('select-file', async () => {
 
 // Process documents
 ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined) => {
+  // Basic arg validation and safe defaults
+  const v = validators.validateProcessDocumentsArgs({ filePaths, summaryType, responseTone, model, summaryStyle, processImagesFlag });
+  if (!v.ok) {
+    return [{ success: false, fileName: '(input)', error: v.error, errorType: 'error' }];
+  }
+  ({ summaryType, responseTone, model, summaryStyle } = v.value);
   const results = [];
   const totalFiles = filePaths.length;
 
   // Load user settings for image limits
   const userSettings = await loadSettings();
   const maxImages = Number(userSettings.maxImageCount) || 3;
-  const processImages = typeof processImagesFlag === 'boolean' ? processImagesFlag : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
+  const processImages = typeof v.value.processImages === 'boolean' ? v.value.processImages : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
   const provider = (userSettings && userSettings.aiProvider) ? userSettings.aiProvider : 'openrouter';
   const providerConfig = (userSettings && userSettings.aiConfig && userSettings.aiConfig[provider]) ? userSettings.aiConfig[provider] : {};
   // Lazy-load heavy modules to avoid increasing startup time
@@ -701,7 +738,7 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
   for (let i = 0; i < filePaths.length; i++) {
     const filePath = filePaths[i];
     try {
-      const fileName = path.basename(filePath);
+  const fileName = path.basename(filePath);
       const ext = path.extname(filePath).toLowerCase();
       
       // Send initial progress
@@ -899,7 +936,7 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
       });
 
       // Decide on vision support
-      const visionAllowed = processImages && (typeof modelSupportsVision === 'function' ? modelSupportsVision(model) : false);
+  const visionAllowed = processImages && (typeof modelSupportsVision === 'function' ? modelSupportsVision(model, provider) : false);
       const imagesToUse = visionAllowed ? imagesForVision : [];
       if (!visionAllowed && imagesForVision && imagesForVision.length) {
         event.sender.send('processing-progress', {
@@ -1056,6 +1093,11 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
 
 // New: Process multiple documents into one combined/aggregate summary (max 3)
 ipcMain.handle('process-documents-combined', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined) => {
+  const v = validators.validateCombinedArgs({ filePaths, summaryType, responseTone, model, summaryStyle, processImagesFlag });
+  if (!v.ok) {
+    return { success: false, error: v.error };
+  }
+  ({ summaryType, responseTone, model, summaryStyle } = v.value);
   // Load user settings for max combined files
   const userSettings = await loadSettings();
   const cfgMaxCombined = Math.max(1, Math.min(10, Number(userSettings.maxCombinedFiles) || 3));
@@ -1069,7 +1111,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
   // Load user settings for image limits
   // (settings already loaded above, but ensure we keep reference name)
   const maxImages = Number(userSettings.maxImageCount) || 3;
-  const processImages = typeof processImagesFlag === 'boolean' ? processImagesFlag : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
+  const processImages = typeof v.value.processImages === 'boolean' ? v.value.processImages : (typeof userSettings.processImages === 'boolean' ? userSettings.processImages : true);
   const provider = (userSettings && userSettings.aiProvider) ? userSettings.aiProvider : 'openrouter';
   const providerConfig = (userSettings && userSettings.aiConfig && userSettings.aiConfig[provider]) ? userSettings.aiConfig[provider] : {};
   // Lazy-load heavy modules
@@ -1232,7 +1274,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
   let combinedSummary;
   try {
     // Respect model vision capability
-    const visionAllowed = processImages && (typeof modelSupportsVision === 'function' ? modelSupportsVision(model) : false);
+  const visionAllowed = processImages && (typeof modelSupportsVision === 'function' ? modelSupportsVision(model, provider) : false);
     const imagesToUse = visionAllowed ? collectedImages.slice(0, 3) : [];
     if (!visionAllowed && collectedImages.length) {
       // Send one notice (associate with first file)
@@ -1373,6 +1415,8 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
 
 // Save summary to file
 ipcMain.handle('save-summary', async (event, fileName, summary) => {
+  const v = validators.validateSaveSummaryArgs({ fileName, summary });
+  if (!v.ok) return { success: false, error: v.error };
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: `${fileName}_summary.txt`,
     filters: [
@@ -1398,9 +1442,10 @@ ipcMain.handle('save-summary', async (event, fileName, summary) => {
 ipcMain.handle('validate-api-key', async (event, arg) => {
   try {
     const { getAdapter } = require('./utils/ai/providers/registry');
-    let provider = 'openrouter';
-    let apiKey = '';
-    let config = {};
+    const payload = typeof arg === 'string' ? { provider: 'openrouter', apiKey: arg } : validators.validateProviderPayload(arg || {});
+    let provider = payload.provider || 'openrouter';
+    let apiKey = payload.apiKey || '';
+    let config = payload.config || {};
 
     if (typeof arg === 'string') {
       apiKey = arg;
@@ -1494,7 +1539,7 @@ ipcMain.handle('delete-api-key', async () => {
 // New Phase 1 IPC: provider-specific credentials save/load/delete
 ipcMain.handle('save-provider-credentials', async (event, { provider, apiKey, config }) => {
   try {
-    if (!provider) return { success: false, error: 'Missing provider' };
+    if (!validators.isValidProvider(provider)) return { success: false, error: 'Invalid provider' };
     await ensureEncryptionLoaded();
     if (!validateEncryption()) return { success: false, error: 'Encryption validation failed' };
     const { map } = await readKeystoreMap();
@@ -1504,7 +1549,8 @@ ipcMain.handle('save-provider-credentials', async (event, { provider, apiKey, co
     // Persist non-secret config to settings
     const settings = await loadSettings();
     settings.aiConfig = settings.aiConfig || {};
-    settings.aiConfig[provider] = { ...(settings.aiConfig[provider] || {}), ...(config || {}) };
+    const sanitizedCfg = validators.validateProviderPayload({ provider, config }).config || {};
+    settings.aiConfig[provider] = { ...(settings.aiConfig[provider] || {}), ...sanitizedCfg };
     await saveSettings(settings);
     return { success: true };
   } catch (error) {
@@ -1514,7 +1560,7 @@ ipcMain.handle('save-provider-credentials', async (event, { provider, apiKey, co
 
 ipcMain.handle('load-provider-credentials', async (event, provider) => {
   try {
-    if (!provider) provider = await getCurrentProvider();
+    if (!validators.isValidProvider(provider)) provider = await getCurrentProvider();
     const { map } = await readKeystoreMap();
     const hasKey = !!(map[provider] && map[provider].apiKey);
     const settings = await loadSettings();
@@ -1527,7 +1573,7 @@ ipcMain.handle('load-provider-credentials', async (event, provider) => {
 
 ipcMain.handle('delete-provider-credentials', async (event, provider) => {
   try {
-    if (!provider) provider = await getCurrentProvider();
+    if (!validators.isValidProvider(provider)) provider = await getCurrentProvider();
     const { map } = await readKeystoreMap();
     if (map[provider]) delete map[provider];
     const keys = Object.keys(map);
@@ -1546,6 +1592,7 @@ ipcMain.handle('delete-provider-credentials', async (event, provider) => {
 // Read file for preview - now reads from folder
 ipcMain.handle('read-stored-file', async (event, folderId) => {
   try {
+    if (!validators.isValidFolderId(folderId)) return { success: false, error: 'Invalid folder id' };
     const folderPath = path.join(documentsStoragePath, folderId);
     
     // Read summary.json to get the filename
@@ -1588,6 +1635,7 @@ ipcMain.handle('read-stored-file', async (event, folderId) => {
 // Get file info - now checks folder
 ipcMain.handle('check-file-exists', async (event, folderId) => {
   try {
+    if (!validators.isValidFolderId(folderId)) return { exists: false };
     const folderPath = path.join(documentsStoragePath, folderId);
     await fs.access(folderPath);
     
@@ -1604,6 +1652,7 @@ ipcMain.handle('check-file-exists', async (event, folderId) => {
 // Delete stored file - now deletes entire folder
 ipcMain.handle('delete-stored-file', async (event, folderId) => {
   try {
+    if (!validators.isValidFolderId(folderId)) return { success: false, error: 'Invalid folder id' };
     const folderPath = path.join(documentsStoragePath, folderId);
     await fs.rm(folderPath, { recursive: true, force: true });
     return { success: true };
@@ -1625,113 +1674,112 @@ function getMimeType(fileName) {
   return mimeTypes[ext] || 'application/octet-stream';
 }
 
-// Get storage paths
+// Get storage paths (for Settings UI)
 ipcMain.handle('get-storage-paths', async () => {
-  const settings = await loadSettings();
-  return {
-    appdata: defaultDocumentsStoragePath,
-    appdataFull: defaultDataPath,
-    localApp: localAppDocumentsPath,
-    localAppFull: localAppDataPath,
-    current: documentsStoragePath,
-    currentFull: dataPath,
-    settings: settings
-  };
+  try {
+    const settings = await loadSettings();
+    return {
+      success: true,
+      // Full paths to display in UI
+      appdataFull: defaultDataPath,
+      localAppFull: localAppDataPath,
+      // Current settings including selected storage location
+      settings
+    };
+  } catch (error) {
+    return {
+      success: true,
+      appdataFull: defaultDataPath,
+      localAppFull: localAppDataPath,
+      settings: { ...defaultSettings }
+    };
+  }
 });
 
-// Get settings
+// Get current settings
 ipcMain.handle('get-settings', async () => {
-  return await loadSettings();
+  try {
+    const settings = await loadSettings();
+    return settings;
+  } catch (_) {
+    return { ...defaultSettings };
+  }
 });
 
-// Save settings
-ipcMain.handle('save-settings', async (event, newSettings) => {
-  const currentSettings = await loadSettings();
-  const updatedSettings = { ...currentSettings, ...newSettings };
-  return await saveSettings(updatedSettings);
+// Save settings (partial updates allowed and sanitized)
+ipcMain.handle('save-settings', async (event, partial) => {
+  try {
+    const current = await loadSettings();
+    const sanitized = validators.sanitizeSettings(partial || {});
+    const next = { ...current, ...sanitized };
+    await saveSettings(next);
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 });
 
-// Get application version
-ipcMain.handle('get-app-version', () => {
-  return app.getVersion();
-});
-
-// Change storage location
+// Change storage location and migrate files
 ipcMain.handle('change-storage-location', async (event, storageLocation) => {
   try {
-    let newDataPath;
-
-    switch (storageLocation) {
-      case 'appdata':
-        newDataPath = defaultDataPath;
-        break;
-      case 'local-app':
-        newDataPath = localAppDataPath;
-        break;
-      default:
-        return { success: false, error: 'Invalid storage location' };
+    if (!validators.isValidStorageLocation(storageLocation)) {
+      return { success: false, error: 'Invalid storage location' };
     }
 
-    // If already using this location, short‑circuit
-    if (dataPath === newDataPath) {
-      return { success: true, path: documentsStoragePath, dataPath }; // nothing to do
-    }
-
+    // Determine new target paths
+    const newDataPath = (storageLocation === 'local-app') ? localAppDataPath : defaultDataPath;
     const newDocumentsPath = path.join(newDataPath, 'documents');
     const newSettingsPath = path.join(newDataPath, 'settings.json');
     const newKeystorePath = path.join(newDataPath, 'keystore.enc');
 
-    // Ensure target directories exist
-    await ensureDataDirectories(newDataPath);
+    // Short-circuit if already at desired location
+    if (newDataPath === dataPath) {
+      return { success: true, path: documentsStoragePath, dataPath: newDataPath, errors: [] };
+    }
 
-    // Capture old paths (for rollback / cleanup)
+    // Ensure target directories exist
+    await fs.mkdir(newDocumentsPath, { recursive: true }).catch(() => {});
+
+    // Attempt to migrate existing data
+    const copyErrors = [];
     const oldDataPath = dataPath;
     const oldDocsPath = documentsStoragePath;
     const oldSettingsPath = settingsPath;
     const oldKeystorePath = keystorePath;
 
-    let copyErrors = [];
-
-    if (oldDocsPath !== newDocumentsPath) {
-      try {
-        // Read entries (documents are folders)
-        const entries = await fs.readdir(oldDocsPath, { withFileTypes: true });
-        for (const entry of entries) {
-          const source = path.join(oldDocsPath, entry.name);
-          const dest = path.join(newDocumentsPath, entry.name);
-          try {
-            if (entry.isDirectory()) {
-              // Recursive copy of entire document folder
-              await fs.cp(source, dest, { recursive: true, force: true });
-            } else {
-              // In case there are stray files (legacy)
-              await fs.copyFile(source, dest);
-            }
-          } catch (err) {
-            copyErrors.push({ item: entry.name, error: err.message });
+    try {
+      const entries = await fs.readdir(oldDocsPath, { withFileTypes: true });
+      for (const entry of entries) {
+        const source = path.join(oldDocsPath, entry.name);
+        const dest = path.join(newDocumentsPath, entry.name);
+        try {
+          if (entry.isDirectory()) {
+            await fs.cp(source, dest, { recursive: true, force: true });
+          } else {
+            await fs.copyFile(source, dest);
           }
+        } catch (err) {
+          copyErrors.push({ item: entry.name, error: err.message });
         }
-
-        // Copy settings if present
-        await fs.copyFile(oldSettingsPath, newSettingsPath).catch(() => {});
-        // Copy keystore if present
-        await fs.copyFile(oldKeystorePath, newKeystorePath).catch(() => {});
-
-        // Only remove old data if all copies succeeded
-        if (copyErrors.length === 0) {
-          // Remove old directories atomically (best‑effort)
-          await fs.rm(oldDocsPath, { recursive: true, force: true }).catch(() => {});
-          // Do not remove oldDataPath entirely if other files may remain; attempt then ignore failure
-          await fs.rm(oldDataPath, { recursive: true, force: true }).catch(() => {});
-        } else {
-          console.warn('Storage migration completed with errors; old data retained for safety:', copyErrors);
-        }
-      } catch (err) {
-        console.warn('Storage migration: old documents path inaccessible or empty:', err.message);
       }
+
+      // Copy settings if present
+      await fs.copyFile(oldSettingsPath, newSettingsPath).catch(() => {});
+      // Copy keystore if present
+      await fs.copyFile(oldKeystorePath, newKeystorePath).catch(() => {});
+
+      // Only remove old data if all copies succeeded
+      if (copyErrors.length === 0) {
+        await fs.rm(oldDocsPath, { recursive: true, force: true }).catch(() => {});
+        await fs.rm(oldDataPath, { recursive: true, force: true }).catch(() => {});
+      } else {
+        console.warn('Storage migration completed with errors; old data retained for safety:', copyErrors);
+      }
+    } catch (err) {
+      console.warn('Storage migration: old documents path inaccessible or empty:', err.message);
     }
 
-    // Update global path references regardless of partial errors (user intent is to switch)
+    // Update global path references
     dataPath = newDataPath;
     documentsStoragePath = newDocumentsPath;
     settingsPath = newSettingsPath;
@@ -1750,6 +1798,11 @@ ipcMain.handle('change-storage-location', async (event, storageLocation) => {
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+// App version for UI
+ipcMain.handle('get-app-version', async () => {
+  try { return app.getVersion(); } catch (_) { return '0.0.0'; }
 });
 
 // Get storage stats
@@ -1977,22 +2030,7 @@ ipcMain.handle('get-summary-history', async () => {
   }
 });
 
-// Add summary to history - now handled by saveSummaryToFolder
-ipcMain.handle('add-summary-to-history', async (event, summaryData) => {
-  // This is now a no-op since summaries are saved during processing
-  return { success: true };
-});
-
-// Save entire history - rebuild all summary.json files
-ipcMain.handle('save-history', async (event, history) => {
-  try {
-    // Note: This is complex with folder-based approach
-    // We'll keep existing folders and only update what's in the history array
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// Deprecated history endpoints removed (folder-based storage saves automatically during processing)
 
 // Delete summary from history by folder ID
 ipcMain.handle('delete-summary-from-history', async (event, folderId) => {
@@ -2088,6 +2126,10 @@ ipcMain.handle('install-update', async (event, restartImmediately = true) => {
 // Q&A: answer a question about a stored summary (by folderId)
 ipcMain.handle('qa-summary', async (event, { folderId, question, apiKey, model }) => {
   try {
+    if (!validators.isValidFolderId(folderId)) return { success: false, error: 'Invalid folder id' };
+    if (typeof question !== 'string' || !question.trim()) {
+      return { success: false, error: 'Question is required' };
+    }
     if (!answerQuestionAboutSummary) {
       const ai = require('./utils/aiSummarizer');
       answerQuestionAboutSummary = ai.answerQuestionAboutSummary;
@@ -2135,80 +2177,20 @@ ipcMain.handle('qa-summary', async (event, { folderId, question, apiKey, model }
   }
 });
 
-// Get available models for a provider
+// Get available models for a provider (loaded from assets/models.json)
 ipcMain.handle('get-provider-models', async (event, provider) => {
   try {
-    if (!provider) provider = 'openrouter';
-    
-    // Define model lists per provider
-    const providerModels = {
-      'openrouter': [
-        { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini (Recommended)', group: 'OpenAI' },
-        { value: 'openai/gpt-4o', label: 'GPT-4o', group: 'OpenAI' },
-        { value: 'openai/gpt-4-turbo', label: 'GPT-4 Turbo', group: 'OpenAI' },
-        { value: 'openai/gpt-3.5-turbo', label: 'GPT-3.5 Turbo', group: 'OpenAI' },
-        { value: 'anthropic/claude-3.5-sonnet', label: 'Claude 3.5 Sonnet', group: 'Anthropic' },
-        { value: 'anthropic/claude-3-opus', label: 'Claude 3 Opus', group: 'Anthropic' },
-        { value: 'anthropic/claude-3-haiku', label: 'Claude 3 Haiku', group: 'Anthropic' },
-        { value: 'google/gemini-pro-1.5', label: 'Gemini 1.5 Pro', group: 'Google' },
-        { value: 'google/gemini-flash-1.5', label: 'Gemini 1.5 Flash', group: 'Google' },
-        { value: 'meta-llama/llama-3.1-70b-instruct', label: 'Llama 3.1 70B', group: 'Meta' },
-        { value: 'meta-llama/llama-3.1-8b-instruct', label: 'Llama 3.1 8B', group: 'Meta' },
-        { value: 'mistralai/mistral-large', label: 'Mistral Large', group: 'Other' },
-        { value: 'perplexity/llama-3.1-sonar-large-128k-online', label: 'Perplexity Sonar', group: 'Other' }
-      ],
-      'openai': [
-        { value: 'gpt-4o', label: 'GPT-4o', group: 'GPT-4' },
-        { value: 'gpt-4o-mini', label: 'GPT-4o Mini (Recommended)', group: 'GPT-4' },
-        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', group: 'GPT-4' },
-        { value: 'gpt-4', label: 'GPT-4', group: 'GPT-4' },
-        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo', group: 'GPT-3.5' }
-      ],
-      'anthropic': [
-        { value: 'claude-3-5-sonnet-20241022', label: 'Claude 3.5 Sonnet (Latest)', group: 'Claude 3.5' },
-        { value: 'claude-3-opus-20240229', label: 'Claude 3 Opus', group: 'Claude 3' },
-        { value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet', group: 'Claude 3' },
-        { value: 'claude-3-haiku-20240307', label: 'Claude 3 Haiku', group: 'Claude 3' }
-      ],
-      'google': [
-        { value: 'gemini-1.5-pro-latest', label: 'Gemini 1.5 Pro (Latest)', group: 'Gemini 1.5' },
-        { value: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash (Latest)', group: 'Gemini 1.5' },
-        { value: 'gemini-pro', label: 'Gemini Pro', group: 'Gemini 1.0' }
-      ],
-      'cohere': [
-        { value: 'command-r-plus', label: 'Command R+', group: 'Command' },
-        { value: 'command-r', label: 'Command R', group: 'Command' },
-        { value: 'command', label: 'Command', group: 'Command' },
-        { value: 'command-light', label: 'Command Light', group: 'Command' }
-      ],
-      'groq': [
-        { value: 'llama-3.3-70b-versatile', label: 'Llama 3.3 70B Versatile', group: 'Llama 3.3' },
-        { value: 'llama-3.1-70b-versatile', label: 'Llama 3.1 70B Versatile', group: 'Llama 3.1' },
-        { value: 'llama-3.1-8b-instant', label: 'Llama 3.1 8B Instant', group: 'Llama 3.1' },
-        { value: 'mixtral-8x7b-32768', label: 'Mixtral 8x7B', group: 'Mixtral' }
-      ],
-      'mistral': [
-        { value: 'mistral-large-latest', label: 'Mistral Large (Latest)', group: 'Mistral' },
-        { value: 'mistral-medium-latest', label: 'Mistral Medium', group: 'Mistral' },
-        { value: 'mistral-small-latest', label: 'Mistral Small', group: 'Mistral' }
-      ],
-      'xai': [
-        { value: 'grok-beta', label: 'Grok Beta', group: 'Grok' }
-      ],
-      'azure-openai': [
-        { value: 'gpt-4o', label: 'GPT-4o', group: 'GPT-4' },
-        { value: 'gpt-4o-mini', label: 'GPT-4o Mini', group: 'GPT-4' },
-        { value: 'gpt-4-turbo', label: 'GPT-4 Turbo', group: 'GPT-4' },
-        { value: 'gpt-4', label: 'GPT-4', group: 'GPT-4' },
-        { value: 'gpt-35-turbo', label: 'GPT-3.5 Turbo', group: 'GPT-3.5' }
-      ],
-      'custom-openai': [
-        { value: 'gpt-4', label: 'GPT-4 (or equivalent)', group: 'Compatible' },
-        { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo (or equivalent)', group: 'Compatible' }
-      ]
-    };
-
-    const models = providerModels[provider] || [];
+    if (!validators.isValidProvider(provider)) provider = 'openrouter';
+    const modelsPath = path.join(__dirname, 'assets', 'models.json');
+    let models = [];
+    try {
+      const json = await fs.readFile(modelsPath, 'utf8');
+      const table = JSON.parse(json);
+      models = (table && table[provider]) || [];
+    } catch (_) {
+      // Fallback to empty list if assets not found; renderer will handle gracefully
+      models = [];
+    }
     return { success: true, models };
   } catch (error) {
     return { success: false, error: error.message, models: [] };

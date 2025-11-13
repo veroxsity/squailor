@@ -1,0 +1,66 @@
+{
+  "openrouter": [
+    { "value": "openai/gpt-4o-mini", "label": "GPT-4o Mini (Recommended)", "group": "OpenAI" },
+    { "value": "openai/gpt-4o", "label": "GPT-4o", "group": "OpenAI" },
+    { "value": "openai/gpt-4-turbo", "label": "GPT-4 Turbo", "group": "OpenAI" },
+    { "value": "openai/gpt-3.5-turbo", "label": "GPT-3.5 Turbo", "group": "OpenAI" },
+    { "value": "anthropic/claude-3.5-sonnet", "label": "Claude 3.5 Sonnet", "group": "Anthropic" },
+    { "value": "anthropic/claude-3-opus", "label": "Claude 3 Opus", "group": "Anthropic" },
+    { "value": "anthropic/claude-3-haiku", "label": "Claude 3 Haiku", "group": "Anthropic" },
+    { "value": "google/gemini-pro-1.5", "label": "Gemini 1.5 Pro", "group": "Google" },
+    { "value": "google/gemini-flash-1.5", "label": "Gemini 1.5 Flash", "group": "Google" },
+    { "value": "meta-llama/llama-3.1-70b-instruct", "label": "Llama 3.1 70B", "group": "Meta" },
+    { "value": "meta-llama/llama-3.1-8b-instruct", "label": "Llama 3.1 8B", "group": "Meta" },
+    { "value": "mistralai/mistral-large", "label": "Mistral Large", "group": "Other" },
+    { "value": "perplexity/llama-3.1-sonar-large-128k-online", "label": "Perplexity Sonar", "group": "Other" }
+  ],
+  "openai": [
+    { "value": "gpt-4o", "label": "GPT-4o", "group": "GPT-4" },
+    { "value": "gpt-4o-mini", "label": "GPT-4o Mini (Recommended)", "group": "GPT-4" },
+    { "value": "gpt-4-turbo", "label": "GPT-4 Turbo", "group": "GPT-4" },
+    { "value": "gpt-4", "label": "GPT-4", "group": "GPT-4" },
+    { "value": "gpt-3.5-turbo", "label": "GPT-3.5 Turbo", "group": "GPT-3.5" }
+  ],
+  "anthropic": [
+    { "value": "claude-3-5-sonnet-20241022", "label": "Claude 3.5 Sonnet (Latest)", "group": "Claude 3.5" },
+    { "value": "claude-3-opus-20240229", "label": "Claude 3 Opus", "group": "Claude 3" },
+    { "value": "claude-3-sonnet-20240229", "label": "Claude 3 Sonnet", "group": "Claude 3" },
+    { "value": "claude-3-haiku-20240307", "label": "Claude 3 Haiku", "group": "Claude 3" }
+  ],
+  "google": [
+    { "value": "gemini-1.5-pro-latest", "label": "Gemini 1.5 Pro (Latest)", "group": "Gemini 1.5" },
+    { "value": "gemini-1.5-flash-latest", "label": "Gemini 1.5 Flash (Latest)", "group": "Gemini 1.5" },
+    { "value": "gemini-pro", "label": "Gemini Pro", "group": "Gemini 1.0" }
+  ],
+  "cohere": [
+    { "value": "command-r-plus", "label": "Command R+", "group": "Command" },
+    { "value": "command-r", "label": "Command R", "group": "Command" },
+    { "value": "command", "label": "Command", "group": "Command" },
+    { "value": "command-light", "label": "Command Light", "group": "Command" }
+  ],
+  "groq": [
+    { "value": "llama-3.3-70b-versatile", "label": "Llama 3.3 70B Versatile", "group": "Llama 3.3" },
+    { "value": "llama-3.1-70b-versatile", "label": "Llama 3.1 70B Versatile", "group": "Llama 3.1" },
+    { "value": "llama-3.1-8b-instant", "label": "Llama 3.1 8B Instant", "group": "Llama 3.1" },
+    { "value": "mixtral-8x7b-32768", "label": "Mixtral 8x7B", "group": "Mixtral" }
+  ],
+  "mistral": [
+    { "value": "mistral-large-latest", "label": "Mistral Large (Latest)", "group": "Mistral" },
+    { "value": "mistral-medium-latest", "label": "Mistral Medium", "group": "Mistral" },
+    { "value": "mistral-small-latest", "label": "Mistral Small", "group": "Mistral" }
+  ],
+  "xai": [
+    { "value": "grok-beta", "label": "Grok Beta", "group": "Grok" }
+  ],
+  "azure-openai": [
+    { "value": "gpt-4o", "label": "GPT-4o", "group": "GPT-4" },
+    { "value": "gpt-4o-mini", "label": "GPT-4o Mini", "group": "GPT-4" },
+    { "value": "gpt-4-turbo", "label": "GPT-4 Turbo", "group": "GPT-4" },
+    { "value": "gpt-4", "label": "GPT-4", "group": "GPT-4" },
+    { "value": "gpt-35-turbo", "label": "GPT-3.5 Turbo", "group": "GPT-3.5" }
+  ],
+  "custom-openai": [
+    { "value": "gpt-4", "label": "GPT-4 (or equivalent)", "group": "Compatible" },
+    { "value": "gpt-3.5-turbo", "label": "GPT-3.5 Turbo (or equivalent)", "group": "Compatible" }
+  ]
+}

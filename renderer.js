@@ -2289,6 +2289,10 @@ function setupSummaryQaChat(item) {
       }
     };
     if (window.electronAPI.onQaProgress) {
+      // Avoid listener leaks by removing any prior listeners for this folderId first
+      if (window.electronAPI.offQaProgress) {
+        window.electronAPI.offQaProgress(item.folderId);
+      }
       window.electronAPI.onQaProgress(item.folderId, progHandler);
     }
 
