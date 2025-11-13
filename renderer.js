@@ -130,6 +130,24 @@ function attachProcessingProgressListener() {
       statusElement.style.lineHeight = '1.4';
     }
 
+    // Friendly error hint toast (once per file & error type)
+    try {
+      if (data.stage === 'error' && data.errorType) {
+        if (!window.__shownErrorHints) window.__shownErrorHints = new Set();
+        const key = data.fileName + ':' + data.errorType;
+        if (!window.__shownErrorHints.has(key)) {
+          window.__shownErrorHints.add(key);
+          const hints = {
+            'rate-limit': 'Rate limit reached. Try again shortly or switch to a less-used model/provider.',
+            'quota': 'Quota exceeded. Check your account usage or upgrade your plan.',
+            'api-key': 'Invalid API key. Verify the key in Settings → AI Providers.'
+          };
+            const msg = hints[data.errorType] || ('Error processing ' + data.fileName);
+            showToast(msg, 'error', 6000);
+        }
+      }
+    } catch (_) {}
+
     if (progressElement) {
       if (data.stage === 'complete' || data.stage === 'error' || data.stage === 'cancelled') {
         progressElement.style.display = 'none';
@@ -1239,7 +1257,9 @@ function showSummaryCompletionModal(results) {
   // Generate summary cards
   summaryCardsDiv.innerHTML = results.map((result, index) => {
     if (result.success) {
-      const reduction = Math.round((1 - result.summary.length / result.originalLength) * 100);
+      const openedExisting = !!result.openedExisting;
+      const hasLengths = typeof result.originalLength === 'number' && result.summary && typeof result.summary.length === 'number';
+      const reduction = hasLengths ? Math.round((1 - result.summary.length / result.originalLength) * 100) : null;
       const fileExt = result.fileName.split('.').pop().toUpperCase();
       const fileIcon = fileExt === 'PDF' ? '📕' : fileExt === 'PPTX' || fileExt === 'PPT' ? '📊' : '📄';
       const summaryType = getSummaryType();
@@ -1260,23 +1280,27 @@ function showSummaryCompletionModal(results) {
             <div class="summary-card-icon">${fileIcon}</div>
             <div class="summary-card-info">
               <div class="summary-card-title">${escapeHtml(result.fileName)}</div>
-              <div class="summary-card-type">${fileExt} Document</div>
+              <div class="summary-card-type">${fileExt} Document${openedExisting ? ' • Existing summary' : ''}</div>
             </div>
           </div>
           <div class="summary-card-footer">
             <div class="summary-card-stats">
-              <div class="summary-card-stat">
-                <span>${summaryType === 'normal' ? '📝' : '⚡'}</span>
-                <span>${summaryType}</span>
-              </div>
-              <div class="summary-card-stat">
-                <span>${toneIcon}</span>
-                <span>${responseTone}</span>
-              </div>
-              <div class="summary-card-stat">
-                <span>📉</span>
-                <span>${reduction}%</span>
-              </div>
+              ${openedExisting ? `
+                <div class="summary-card-stat"><span>📁</span><span>Opened existing</span></div>
+              ` : `
+                <div class="summary-card-stat">
+                  <span>${summaryType === 'normal' ? '📝' : '⚡'}</span>
+                  <span>${summaryType}</span>
+                </div>
+                <div class="summary-card-stat">
+                  <span>${toneIcon}</span>
+                  <span>${responseTone}</span>
+                </div>
+                <div class="summary-card-stat">
+                  <span>📉</span>
+                  <span>${reduction ?? '—'}${reduction === null ? '' : '%'}</span>
+                </div>
+              `}
             </div>
             <div class="summary-card-action">
               View <span>→</span>
@@ -1704,7 +1728,54 @@ ${item.summary}`;
   URL.revokeObjectURL(url);
 }
 
-function viewFullSummary(index) {
+// Lazy-load markdown libraries only when needed (summary view)
+const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+const DOMPURIFY_CDN = 'https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js';
+
+function loadScriptOnce(src) {
+  return new Promise((resolve, reject) => {
+    // If already present, resolve immediately
+    const existing = Array.from(document.getElementsByTagName('script')).find(s => s.src === src);
+    if (existing) {
+      if (existing.dataset.loaded === 'true') return resolve();
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.async = true;
+    script.addEventListener('load', () => {
+      script.dataset.loaded = 'true';
+      resolve();
+    });
+    script.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureMarkdownLibs(timeoutMs = 6000) {
+  // If both are present, nothing to do
+  const hasMarked = typeof window.marked !== 'undefined' && typeof window.marked.parse === 'function';
+  const hasPurify = typeof window.DOMPurify !== 'undefined' && typeof window.DOMPurify.sanitize === 'function';
+  if (hasMarked && hasPurify) return true;
+
+  const timer = new Promise((_, reject) => setTimeout(() => reject(new Error('Markdown libs load timeout')), timeoutMs));
+  try {
+    // Load marked first, then DOMPurify; tolerate one missing and fall back later
+    await Promise.race([loadScriptOnce(MARKED_CDN), timer]);
+  } catch (_) {
+    // ignore, we'll fall back to plain rendering
+  }
+  try {
+    await Promise.race([loadScriptOnce(DOMPURIFY_CDN), timer]);
+  } catch (_) {
+    // ignore, sanitization will be skipped with warning
+  }
+  return (typeof window.marked !== 'undefined');
+}
+
+async function viewFullSummary(index) {
   const item = summaryHistory[index];
   
   // Store current summary index for actions
@@ -1775,6 +1846,9 @@ function viewFullSummary(index) {
       }
     }
   } catch (_) {}
+  // Ensure markdown libraries are present (will no-op if already loaded)
+  await ensureMarkdownLibs().catch(() => {});
+
   try {
     // Check if marked is available
     if (typeof marked !== 'undefined' && marked.parse) {

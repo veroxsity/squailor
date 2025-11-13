@@ -31,28 +31,28 @@ This checklist tracks high-impact fixes, hardening, and quality upgrades across 
 - [x] (T2) Switch duplicate detection to SHA-256 (docs already claim SHA-256)
   - Update `utils/fileHash.js` and validate compatibility
 - [x] (T6) Remove `originalText` from IPC results to reduce memory/IPC load
-- [ ] (T16) Audit blocking updater flow vs non-blocking listeners
+- [x] (T16) Audit blocking updater flow vs non-blocking listeners
   - Ensure splash always closes; no double event firing; robust timeout path
 
 ## UX improvements
 
-- [ ] (T5, T25) Register one `processing-progress` listener and gate verbose logs to dev mode
+- [x] (T5, T25) Register one `processing-progress` listener and gate verbose logs to dev mode
 - [ ] (T26) Duplicate dialog: Add "Open existing" action to jump to History entry
 - [ ] (T27) Ensure Q&A `qa-progress` listeners are disposed when leaving summary view
-- [ ] (T19) If `canvas` is missing, show a Settings tip for improved PDF thumbnails
+- [x] (T19) If `canvas` is missing, show a Settings tip for improved PDF thumbnails
 - [ ] (T30) Normalize rate-limit/quota/api-key errors into friendlier messages and hints
 
 ## AI/Model routing
 
-- [ ] (T11) Token-aware chunking (replace char-based chunking)
-- [ ] (T12) Model vision capability map by provider (fewer heuristic misses)
-- [ ] (T18) Externalize provider model lists (JSON or on-demand fetch), keep safe fallbacks
+- [x] (T11) Token-aware chunking (replace char-based chunking)
+- [x] (T12) Model vision capability map by provider (fewer heuristic misses)
+- [x] (T18) Externalize provider model lists (JSON or on-demand fetch), keep safe fallbacks
 - [x] (T9) Update OpenRouter referer/headers to actual repo/title
 - [ ] (T28) Consider Azure streaming support (optional)
 
 ## Build, Packaging, Tooling
 
-- [ ] (T22) Add ESLint + Prettier, wire to prebuild
+- [x] (T22) Add ESLint + Prettier, wire to prebuild
 - [x] (T10) Add Jest tests for encryption, hashing, parsing, and chunking
 - [ ] (T24) Evaluate enabling `asar`; add `extraResources`/`asarUnpack` if needed
 - [ ] Ensure scripts/verify-deps stays green (npm audit high/critical = fail)

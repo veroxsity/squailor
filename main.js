@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, session } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const validators = require('./utils/validators');
@@ -548,6 +548,43 @@ function createMainWindow() {
     mainWindow.webContents.openDevTools();
   }
 
+  // Network telemetry assertion: Monitor outbound requests and record non-allowlisted hosts
+  try {
+    const allowedHostPatterns = [
+      'localhost',
+      '127.0.0.1',
+      'openai',
+      'anthropic',
+      'openrouter',
+      'googleapis',
+      'cohere',
+      'groq',
+      'mistral',
+      'x.ai',
+      'azure',
+      'github.com',
+      'fonts.googleapis.com',
+      'fonts.gstatic.com',
+      'jsdelivr.net'
+    ];
+    if (!global.__suspiciousRequests) {
+      global.__suspiciousRequests = new Set();
+    }
+    session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
+      try {
+        const url = details.url || '';
+        if (url.startsWith('http')) {
+          const host = new URL(url).host.toLowerCase();
+          const allowed = allowedHostPatterns.some(p => host.includes(p));
+          if (!allowed) {
+            global.__suspiciousRequests.add(host);
+          }
+        }
+      } catch (_) { /* ignore parse errors */ }
+      callback({ cancel: false });
+    });
+  } catch (e) { /* ignore telemetry setup errors */ }
+
   // When the renderer signals it's ready to show, close splash and show main
   mainWindow.once('ready-to-show', () => {
     const readyTime = Date.now();
@@ -776,7 +813,8 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
           type: 'question',
           title: 'Duplicate Document Found',
           message: `A document with the same content already exists:\n\n"${duplicateCheck.fileName}"\n\nWhat would you like to do?`,
-          buttons: ['Cancel', 'Overwrite Existing', 'Create New Copy'],
+          // Keep existing button indices stable; add a 4th option at the end
+          buttons: ['Cancel', 'Overwrite Existing', 'Create New Copy', 'Open Existing'],
           defaultId: 0,
           cancelId: 0
         });
@@ -807,6 +845,23 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
             stage: 'cleanup'
           });
           await fs.rm(duplicateCheck.folderPath, { recursive: true, force: true }).catch(() => {});
+        } else if (choice.response === 3) {
+          // Open existing - do not process, return a navigable result with existing folderId
+          event.sender.send('processing-progress', {
+            fileName,
+            fileIndex: i + 1,
+            totalFiles,
+            status: 'Opening existing summary',
+            stage: 'duplicate-open'
+          });
+
+          results.push({
+            fileName,
+            success: true,
+            folderId: duplicateCheck.folderId,
+            openedExisting: true
+          });
+          continue;
         }
         // If response === 2, just continue and create new copy
       }
@@ -2194,5 +2249,19 @@ ipcMain.handle('get-provider-models', async (event, provider) => {
     return { success: true, models };
   } catch (error) {
     return { success: false, error: error.message, models: [] };
+  }
+});
+
+// Network diagnostics: return suspicious outbound hosts for telemetry assertion
+ipcMain.handle('get-network-diagnostics', async () => {
+  try {
+    const suspicious = Array.from(global.__suspiciousRequests || []);
+    return {
+      success: true,
+      suspiciousHosts: suspicious,
+      count: suspicious.length
+    };
+  } catch (e) {
+    return { success: false, error: e && e.message };
   }
 });
