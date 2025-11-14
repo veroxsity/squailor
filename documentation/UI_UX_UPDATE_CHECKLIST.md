@@ -56,7 +56,7 @@ Tip: For accessibility items, validate with automated tools (axe, WAVE, Lighthou
 ## Phase 2 — Foundations and Design System
 ### 2.1 Visual Foundations
 - [ ] Brand tokens: colors, typography scale, spacing, radii, elevation, motion.
-- [ ] Light/Dark/High-Contrast palettes with semantic tokens (bg, surface, border, text, success/warn/error/info).
+- [x] Light/Dark/High-Contrast palettes with semantic tokens (bg, surface, border, text, success/warn/error/info).
 - [ ] Typography: base size, line-height, headings scale, code styles, truncation/overflow rules.
 - [ ] Iconography set: sizes, stroke/fill rules, empty-state illustrations.
 - [ ] Grid and layout rules (content width, gutters, breakpoints—even for desktop resize).
@@ -72,9 +72,9 @@ Tip: For accessibility items, validate with automated tools (axe, WAVE, Lighthou
 - [ ] Responsive and resizable window behaviors (min/max window sizes, layout adapts on resize).
 
 ### 2.3 Theming and Tokens in Code
-- [ ] Centralize CSS variables/tokens in `styles.css` (or a tokens file).
-- [ ] Implement theme switch (Light/Dark/High-Contrast) and persist preference.
-- [ ] Respect OS color scheme (prefers-color-scheme) unless user overrides.
+- [x] Centralize CSS variables/tokens in `styles.css` (or a tokens file).
+- [x] Implement theme switch (Light/Dark/High-Contrast) and persist preference.
+- [x] Respect OS color scheme (prefers-color-scheme) unless user overrides.
 - [ ] Ensure Electron titlebar/custom frame styling alignment across platforms.
 
 ---
@@ -111,7 +111,7 @@ Copy and Content Style
 - [ ] Focus management on route/dialog open/close; return focus to invoker.
 - [ ] aria-live regions for async status updates; avoid announcements loops.
 - [ ] Keyboard shortcuts listed in a dedicated help modal; ensure remapping or disable.
-- [ ] High Contrast theme: visible boundaries and outlines retained.
+- [x] High Contrast theme: visible boundaries and outlines retained.
 
 ---
 
@@ -193,7 +193,7 @@ Copy and Content Style
 ## Definition of Done (DoD) for the UI/UX Update
 - [ ] Heuristic and accessibility audits pass with documented fixes.
 - [ ] All core flows redesigned, implemented, and verified via tests.
-- [ ] Theming implemented with semantic tokens and persisted preference.
+- [x] Theming implemented with semantic tokens and persisted preference.
 - [ ] Critical performance KPIs meet agreed thresholds.
 - [ ] Docs, screenshots, and What’s New updated.
 - [ ] Telemetry/consent model implemented as designed.

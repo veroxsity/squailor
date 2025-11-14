@@ -1899,6 +1899,25 @@ body.light-theme .file-item {
   background: linear-gradient(140deg, rgba(248, 250, 255, 0.92), rgba(226, 232, 240, 0.8));
 }
 
+/* High-contrast preview swatch for theme selector */
+.theme-preview.high-contrast {
+  background: linear-gradient(140deg, #000000 50%, #1a1a1a 50%);
+  border: 2px solid #ffffff;
+}
+
+/* Clear active/hover visuals within High Contrast */
+body.high-contrast-theme .theme-option.active,
+body.high-contrast-theme .theme-option:hover {
+  border-color: #ffffff;
+  background: transparent;
+}
+
+/* Ensure visible boundaries for key items in High Contrast without layout shift */
+body.high-contrast-theme .rail-item {
+  outline: 2px solid var(--border-strong);
+  outline-offset: -2px;
+}
+
 .update-actions {
   display: flex;
   align-items: center;
