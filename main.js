@@ -2,6 +2,107 @@ const { app, BrowserWindow, ipcMain, dialog, Menu, session } = require('electron
 const path = require('path');
 const fs = require('fs').promises;
 const validators = require('./utils/validators');
+const MAX_NETWORK_DIAGNOSTIC_EVENTS = 200;
+const MAX_NETWORK_SAMPLE_PATHS = 5;
+
+function ensureNetworkDiagnosticsStore() {
+  if (!global.__networkDiagnostics) {
+    global.__networkDiagnostics = {
+      hosts: new Map(),
+      events: []
+    };
+  }
+  return global.__networkDiagnostics;
+}
+
+function normalizeDiagnosticsPath(parsedUrl) {
+  try {
+    const raw = `${parsedUrl.pathname || '/'}${parsedUrl.search || ''}` || '/';
+    const trimmed = raw.replace(/\s+/g, ' ').trim() || '/';
+    return trimmed.length > 200 ? `${trimmed.slice(0, 197)}…` : trimmed;
+  } catch (_) {
+    return '/';
+  }
+}
+
+function recordSuspiciousNetworkRequest(url, method) {
+  try {
+    const parsed = new URL(url);
+    const host = (parsed.host || '').toLowerCase();
+    if (!host) return;
+    const store = ensureNetworkDiagnosticsStore();
+    const now = Date.now();
+    const path = normalizeDiagnosticsPath(parsed);
+    let hostEntry = store.hosts.get(host);
+    if (!hostEntry) {
+      hostEntry = {
+        host,
+        count: 0,
+        firstSeen: now,
+        lastSeen: now,
+        samplePaths: [],
+        lastProtocol: parsed.protocol ? parsed.protocol.replace(':', '') : null,
+        lastPort: parsed.port || null
+      };
+      store.hosts.set(host, hostEntry);
+    }
+    hostEntry.count += 1;
+    hostEntry.lastSeen = now;
+    hostEntry.lastProtocol = parsed.protocol ? parsed.protocol.replace(':', '') : hostEntry.lastProtocol || null;
+    hostEntry.lastPort = parsed.port || hostEntry.lastPort || null;
+    if (path && !hostEntry.samplePaths.includes(path) && hostEntry.samplePaths.length < MAX_NETWORK_SAMPLE_PATHS) {
+      hostEntry.samplePaths.push(path);
+    }
+
+    store.events.push({
+      host,
+      method: method || 'GET',
+      path,
+      protocol: parsed.protocol ? parsed.protocol.replace(':', '') : null,
+      port: parsed.port || null,
+      timestamp: now
+    });
+    const overflow = store.events.length - MAX_NETWORK_DIAGNOSTIC_EVENTS;
+    if (overflow > 0) {
+      store.events.splice(0, overflow);
+    }
+  } catch (_) {
+    // Ignore malformed URLs
+  }
+}
+
+function clearNetworkDiagnosticsStore() {
+  const store = ensureNetworkDiagnosticsStore();
+  store.hosts.clear();
+  store.events = [];
+  return store;
+}
+
+function getNetworkDiagnosticsSnapshot() {
+  const store = ensureNetworkDiagnosticsStore();
+  const hostSummaries = Array.from(store.hosts.values())
+    .sort((a, b) => (b.lastSeen || 0) - (a.lastSeen || 0))
+    .map(entry => ({
+      host: entry.host,
+      count: entry.count,
+      firstSeen: entry.firstSeen,
+      lastSeen: entry.lastSeen,
+      samplePaths: entry.samplePaths,
+      lastProtocol: entry.lastProtocol,
+      lastPort: entry.lastPort
+    }));
+  const events = store.events
+    .slice()
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  return {
+    totals: {
+      hosts: hostSummaries.length,
+      events: events.length
+    },
+    hostSummaries,
+    events
+  };
+}
 // Lazy-loaded heavy modules (required on demand to speed up app startup)
 let pdfParse;
 let parsePresentation;
@@ -675,9 +776,7 @@ function createMainWindow() {
       'fonts.gstatic.com',
   // jsdelivr no longer used after bundling markdown libs locally
     ];
-    if (!global.__suspiciousRequests) {
-      global.__suspiciousRequests = new Set();
-    }
+    ensureNetworkDiagnosticsStore();
     session.defaultSession.webRequest.onBeforeRequest((details, callback) => {
       try {
         const url = details.url || '';
@@ -685,7 +784,7 @@ function createMainWindow() {
           const host = new URL(url).host.toLowerCase();
           const allowed = allowedHostPatterns.some(p => host.includes(p));
           if (!allowed) {
-            global.__suspiciousRequests.add(host);
+            recordSuspiciousNetworkRequest(url, details.method);
           }
         }
       } catch (_) { /* ignore parse errors */ }
@@ -2237,6 +2336,9 @@ ipcMain.handle('get-summary-history', async () => {
 // Delete summary from history by folder ID
 ipcMain.handle('delete-summary-from-history', async (event, folderId) => {
   try {
+    if (!validators.isValidFolderId(folderId)) {
+      return { success: false, error: 'Invalid folder id' };
+    }
     const folderPath = path.join(documentsStoragePath, folderId);
     
     // Delete entire folder (contains document + summary.json)
@@ -2541,11 +2643,12 @@ ipcMain.handle('get-provider-models', async (event, provider) => {
 // Network diagnostics: return suspicious outbound hosts for telemetry assertion
 ipcMain.handle('get-network-diagnostics', async () => {
   try {
-    const suspicious = Array.from(global.__suspiciousRequests || []);
+    const snapshot = getNetworkDiagnosticsSnapshot();
     return {
       success: true,
-      suspiciousHosts: suspicious,
-      count: suspicious.length
+      totals: snapshot.totals,
+      suspiciousHosts: snapshot.hostSummaries,
+      recentEvents: snapshot.events
     };
   } catch (e) {
     return { success: false, error: e && e.message };
@@ -2555,11 +2658,7 @@ ipcMain.handle('get-network-diagnostics', async () => {
 // Clear network diagnostics list
 ipcMain.handle('clear-network-diagnostics', async () => {
   try {
-    if (global.__suspiciousRequests) {
-      try { global.__suspiciousRequests.clear(); } catch (_) { global.__suspiciousRequests = new Set(); }
-    } else {
-      global.__suspiciousRequests = new Set();
-    }
+    clearNetworkDiagnosticsStore();
     return { success: true };
   } catch (e) {
     return { success: false, error: e && e.message };

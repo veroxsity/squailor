@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://* http://*;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self'; connect-src 'self' https://*.openrouter.ai https://api.openai.com https://api.anthropic.com https://generativelanguage.googleapis.com https://api.cohere.ai https://api.groq.com https://api.mistral.ai https://api.x.ai https://*.openai.azure.com https://*.azure.com https://*.azureedge.net https://github.com https://raw.githubusercontent.com https://objects.githubusercontent.com https://fonts.googleapis.com https://fonts.gstatic.com http://localhost:* http://127.0.0.1:* https://localhost:* https://127.0.0.1:*; frame-ancestors 'self';">
   <title>Squailor - AI Document Summarizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -62,59 +62,150 @@
 
     <div class="app-main">
       <header class="app-header">
-        <div class="header-title">
+        <div class="header-title stack-sm">
           <h1 id="appHeading">Document workspace</h1>
           <p id="appSubtitle">Transform your documents into concise, intelligent summaries</p>
         </div>
-        <div class="header-actions">
+        <div class="header-actions cluster">
           <button class="btn btn-ghost" id="openSettingsAppearance">🎨 Theme</button>
           <button class="btn btn-outline" id="headerHistoryShortcut" data-page="history">
             <span class="btn-icon">🕑</span>
             <span>History</span>
           </button>
         </div>
+        <div class="status-strip" role="status" aria-live="polite">
+          <div class="status-chip">
+            <div class="status-chip-heading">
+              <span class="status-chip-icon">🔌</span>
+              <span class="status-chip-label">Provider</span>
+            </div>
+            <div class="status-chip-value" id="statusProviderValue">Loading…</div>
+            <div class="status-chip-meta" id="statusProviderMeta" data-state="warn">Checking key…</div>
+            <div class="status-chip-actions">
+              <button class="status-chip-link" data-page="settings" data-panel="models">Manage</button>
+            </div>
+          </div>
+          <div class="status-chip">
+            <div class="status-chip-heading">
+              <span class="status-chip-icon">📂</span>
+              <span class="status-chip-label">Queue</span>
+            </div>
+            <div class="status-chip-value" id="statusQueueValue">0 files</div>
+            <div class="status-chip-meta" id="statusQueueMeta" data-state="idle">Queue idle</div>
+            <div class="status-chip-actions">
+              <button class="status-chip-link" data-page="history">Open history</button>
+            </div>
+          </div>
+          <div class="status-chip">
+            <div class="status-chip-heading">
+              <span class="status-chip-icon">🌐</span>
+              <span class="status-chip-label">Network</span>
+            </div>
+            <div class="status-chip-value" id="statusNetworkValue">Detecting…</div>
+            <div class="status-chip-meta" id="statusNetworkMeta" data-state="idle">Checking status</div>
+          </div>
+        </div>
       </header>
 
       <main id="mainContent" class="app-content" tabindex="-1">
-        <!-- ...existing content replaced with redesigned sections... -->
-        <section id="homePage" class="page page-active" aria-labelledby="homeTitle">
-          <div class="home-hero">
-            <div class="hero-content">
-              <h1 id="homeTitle">Transform documents into insights</h1>
-              <p>Upload your PDFs, presentations, or documents and get intelligent summaries tailored to your needs.</p>
-              <div class="hero-chips">
-                <span class="chip">⚡ Fast & accurate</span>
-                <span class="chip">🎯 Customizable output</span>
-                <span class="chip">📊 Multiple formats</span>
+        <div class="app-pages stack-lg">
+          <!-- ...existing content replaced with redesigned sections... -->
+        <section id="homePage" class="page page-active stack-lg" aria-labelledby="homeTitle">
+          <div class="home-hero surface-raised stack-md">
+            <div class="hero-content stack-sm">
+              <div class="inline-meta">
+                <span class="status-pill info">Workspace</span>
+                <span class="status-pill success" id="homeProviderBadge">Provider: Loading…</span>
+              </div>
+              <div class="stack-xs">
+                <h1 id="homeTitle" class="text-display">Transform documents into insights</h1>
+                <p class="text-secondary">Upload PDFs, PPTX, and DOCX files, then tailor length, tone, and format to generate summaries that match your voice.</p>
+              </div>
+              <div id="heroProviderAlert" class="hero-alert" hidden>
+                <div class="hero-alert-text">
+                  <strong>API key required</strong>
+                  <span>Add an AI provider key to start summarizing documents.</span>
+                </div>
+                <button id="heroProviderCta" class="btn btn-outline" data-page="settings" data-panel="models">Add API key</button>
+              </div>
+              <div class="hero-chips inline-scroll" aria-label="Key benefits">
+                <span class="chip">⚡ Real-time streaming</span>
+                <span class="chip">🎯 Custom tones</span>
+                <span class="chip">📊 Combined files</span>
+                <span class="chip">🛡️ Local-first privacy</span>
+                <span class="chip">🔐 Secure storage</span>
+              </div>
+              <div class="hero-stats cluster cluster-nowrap" role="list">
+                <div class="stat-card" role="listitem">
+                  <span class="stat-label">Summaries generated</span>
+                  <strong id="heroStatSummaries">—</strong>
+                </div>
+                <div class="stat-card" role="listitem">
+                  <span class="stat-label">Queued files</span>
+                  <strong id="heroStatQueue">0</strong>
+                </div>
+                <div class="stat-card" role="listitem">
+                  <span class="stat-label">Last run</span>
+                  <strong id="heroStatLastRun">Not yet</strong>
+                </div>
+              </div>
+            </div>
+            <div class="hero-guidance cluster cluster-nowrap" role="list">
+              <div class="guidance-card" role="listitem">
+                <div class="guidance-icon">🔐</div>
+                <div>
+                  <strong>Missing API key?</strong>
+                  <p class="text-muted">Open <button class="btn-link" data-page="settings" data-panel="models">Settings → AI Providers</button> to add one.</p>
+                </div>
+              </div>
+              <div class="guidance-card" role="listitem">
+                <div class="guidance-icon">🧠</div>
+                <div>
+                  <strong>Need combined insights?</strong>
+                  <p class="text-muted">Enable "Combine files" below to merge up to 3 files into one summary.</p>
+                </div>
+              </div>
+              <div class="guidance-card" role="listitem">
+                <div class="guidance-icon">📚</div>
+                <div>
+                  <strong>New to Squailor?</strong>
+                  <p class="text-muted">Browse the <button class="btn-link" data-page="history">History</button> view for recent runs or open <button class="btn-link" data-page="settings" data-panel="about">About</button> to learn more.</p>
+                </div>
               </div>
             </div>
           </div>
 
-          <div class="home-container">
-            <!-- Options Section -->
-            <div class="home-options">
+          <div class="home-layout">
+            <div class="home-options stack-md">
               <div class="options-grid">
                 <!-- Summary Length -->
                 <div class="option-card">
                   <div class="option-card-header">
-                    <h3>📊 Length</h3>
+                    <div class="option-meta">
+                      <div class="option-icon">�</div>
+                      <div class="stack-xs">
+                        <span class="option-eyebrow">Output length</span>
+                        <h3>Summary depth</h3>
+                        <p class="option-description">Control how brief or detailed your summaries should be.</p>
+                      </div>
+                    </div>
                   </div>
                   <div class="option-card-body">
                     <div class="option-group" role="radiogroup" aria-label="Summary length">
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="summaryType" value="short" id="modeShort">
-                        <span class="option-label">Short</span>
-                        <span class="option-sub">Quick bullets</span>
+                        <span class="choice-title">Short</span>
+                        <span class="choice-desc">Quick bullets</span>
                       </label>
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="summaryType" value="normal" id="modeNormal" checked>
-                        <span class="option-label">Normal</span>
-                        <span class="option-sub">Balanced</span>
+                        <span class="choice-title">Normal</span>
+                        <span class="choice-desc">Balanced detail</span>
                       </label>
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="summaryType" value="longer" id="modeLonger">
-                        <span class="option-label">Longer</span>
-                        <span class="option-sub">Detailed</span>
+                        <span class="choice-title">Longer</span>
+                        <span class="choice-desc">Deep dives</span>
                       </label>
                     </div>
                   </div>
@@ -123,29 +214,36 @@
                 <!-- Response Tone -->
                 <div class="option-card">
                   <div class="option-card-header">
-                    <h3>💬 Tone</h3>
+                    <div class="option-meta">
+                      <div class="option-icon">🎯</div>
+                      <div class="stack-xs">
+                        <span class="option-eyebrow">Tone</span>
+                        <h3>Voice & personality</h3>
+                        <p class="option-description">Match the summary tone to your audience.</p>
+                      </div>
+                    </div>
                   </div>
                   <div class="option-card-body">
                     <div class="option-group" role="radiogroup" aria-label="Response tone">
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="responseTone" value="casual" id="toneCasual" checked>
-                        <span class="option-label">Casual</span>
-                        <span class="option-sub">Friendly</span>
+                        <span class="choice-title">Casual</span>
+                        <span class="choice-desc">Friendly & warm</span>
                       </label>
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="responseTone" value="formal" id="toneFormal">
-                        <span class="option-label">Formal</span>
-                        <span class="option-sub">Academic</span>
+                        <span class="choice-title">Formal</span>
+                        <span class="choice-desc">Academic clarity</span>
                       </label>
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="responseTone" value="informative" id="toneInformative">
-                        <span class="option-label">Informative</span>
-                        <span class="option-sub">Factual</span>
+                        <span class="choice-title">Informative</span>
+                        <span class="choice-desc">Factual & neutral</span>
                       </label>
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="responseTone" value="eli5" id="toneEli5">
-                        <span class="option-label">ELI5</span>
-                        <span class="option-sub">Explain Like I'm 5</span>
+                        <span class="choice-title">ELI5</span>
+                        <span class="choice-desc">Explain simply</span>
                       </label>
                     </div>
                   </div>
@@ -154,19 +252,26 @@
                 <!-- Summary Style -->
                 <div class="option-card">
                   <div class="option-card-header">
-                    <h3>📝 Format</h3>
+                    <div class="option-meta">
+                      <div class="option-icon">📝</div>
+                      <div class="stack-xs">
+                        <span class="option-eyebrow">Format</span>
+                        <h3>Delivery style</h3>
+                        <p class="option-description">Pick a structure that fits how you review notes.</p>
+                      </div>
+                    </div>
                   </div>
                   <div class="option-card-body">
                     <div class="option-group" role="radiogroup" aria-label="Summary style">
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="summaryStyle" value="teaching" id="styleTeaching" checked>
-                        <span class="option-label">Teaching</span>
-                        <span class="option-sub">Structured</span>
+                        <span class="choice-title">Teaching</span>
+                        <span class="choice-desc">Sectioned overview</span>
                       </label>
-                      <label class="compact-option">
+                      <label class="option-choice">
                         <input type="radio" name="summaryStyle" value="notes" id="styleNotes">
-                        <span class="option-label">Notes</span>
-                        <span class="option-sub">Bullets</span>
+                        <span class="choice-title">Notes</span>
+                        <span class="choice-desc">Dense bullet list</span>
                       </label>
                     </div>
                   </div>
@@ -175,26 +280,42 @@
                 <!-- Model Settings -->
                 <div class="option-card">
                   <div class="option-card-header">
-                    <h3>⚙️ Settings</h3>
+                    <div class="option-meta">
+                      <div class="option-icon">⚙️</div>
+                      <div class="stack-xs">
+                        <span class="option-eyebrow">AI settings</span>
+                        <h3>Models & preferences</h3>
+                        <p class="option-description">Choose the provider, enable OCR, and combine files when needed.</p>
+                      </div>
+                    </div>
                   </div>
                   <div class="option-card-body">
                     <div class="settings-form">
                       <div class="setting-group">
-                        <label for="modelSelect" class="setting-label">
-                          AI Model
-                          <span id="currentProviderLabel" class="text-muted" style="font-size: 0.7em; font-weight: normal; margin-left: 6px;">Current provider: Loading...</span>
+                        <label for="modelSelect" class="setting-label">AI Model</label>
+                        <div class="model-select-row">
+                          <select id="modelSelect" class="modern-select">
+                            <option value="">Loading models...</option>
+                          </select>
+                          <button type="button" class="btn btn-ghost btn-small" data-page="settings" data-panel="models">Manage</button>
+                        </div>
+                        <p id="currentProviderLabel" class="setting-hint">Current provider: Loading...</p>
+                      </div>
+                      <div class="setting-switchboard">
+                        <label class="setting-toggle">
+                          <input type="checkbox" id="processImagesToggle" checked>
+                          <div>
+                            <span class="toggle-title">Analyze images (OCR)</span>
+                            <span class="toggle-desc">Extract diagrams, slides, and scans automatically.</span>
+                          </div>
                         </label>
-                        <select id="modelSelect" class="modern-select">
-                          <option value="">Loading models...</option>
-                        </select>
-                      </div>
-                      <div class="setting-toggle">
-                        <input type="checkbox" id="processImagesToggle" checked>
-                        <label for="processImagesToggle">Analyze images (OCR)</label>
-                      </div>
-                      <div class="setting-toggle">
-                        <input type="checkbox" id="combinedToggle">
-                        <label for="combinedToggle">Combine files <span class="text-muted">(max 3)</span></label>
+                        <label class="setting-toggle">
+                          <input type="checkbox" id="combinedToggle">
+                          <div>
+                            <span class="toggle-title">Combine files</span>
+                            <span class="toggle-desc" id="combinedHelperLabel">Limit 3 files; best for multi-part lectures.</span>
+                          </div>
+                        </label>
                       </div>
                     </div>
                   </div>
@@ -202,10 +323,9 @@
               </div>
             </div>
 
-            <!-- Upload Section -->
             <div class="home-upload">
-              <div class="upload-card">
-                <div id="uploadArea" class="upload-zone" role="button" tabindex="0" aria-label="Drop files here">
+              <div class="upload-card surface-raised stack-md">
+                <div id="uploadArea" class="upload-zone stack-sm" role="button" tabindex="0" aria-label="Drop files here">
                   <div class="upload-visual">
                     <svg class="upload-icon" width="80" height="80" viewBox="0 0 96 96" fill="none">
                       <circle cx="48" cy="48" r="44" stroke="url(#uploadGrad)" stroke-width="2" stroke-dasharray="6 8" opacity="0.6"/>
@@ -218,17 +338,25 @@
                       </defs>
                     </svg>
                   </div>
-                  <div class="upload-text">
-                    <h2>Drop files here</h2>
-                    <p>or click to browse</p>
+                  <div class="upload-text stack-xs">
+                    <h2 class="text-h2">Drop files here</h2>
+                    <p class="text-muted">or click to browse</p>
+                    <div class="upload-hints inline-meta">
+                      <span class="chip">PDF</span>
+                      <span class="chip">PPTX</span>
+                      <span class="chip">DOCX</span>
+                    </div>
                   </div>
                 </div>
 
-                <button id="selectFiles" class="btn btn-secondary btn-block">
-                  <span>📁 Browse files</span>
-                </button>
+                <div class="upload-actions cluster">
+                  <button id="selectFiles" class="btn btn-secondary">
+                    <span>📁 Browse files</span>
+                  </button>
+                  <button class="btn btn-ghost" id="openRecentDocs">History</button>
+                </div>
 
-                <div id="fileList" class="file-list" aria-live="polite"></div>
+                <div id="fileList" class="file-list stack-sm" aria-live="polite"></div>
 
                 <footer class="upload-footer">
                   <div class="footer-stats">
@@ -239,6 +367,10 @@
                     <div class="stat">
                       <span class="stat-label">Tokens</span>
                       <strong id="queueTokens">—</strong>
+                    </div>
+                    <div class="stat" id="costEstimate" hidden>
+                      <span class="stat-label">Est. Cost</span>
+                      <strong id="queueCost">—</strong>
                     </div>
                   </div>
                   <button id="processFiles" class="btn btn-primary btn-large" disabled>
@@ -258,7 +390,7 @@
           </section>
         </section>
 
-        <section id="historyPage" class="page" aria-labelledby="historyTitle" hidden>
+  <section id="historyPage" class="page" aria-labelledby="historyTitle" hidden>
           <div class="page-heading">
             <div>
               <h2 id="historyTitle">Summary history</h2>
@@ -305,7 +437,7 @@
           </div>
         </section>
 
-        <section id="summaryViewPage" class="page" aria-labelledby="summaryViewHeading" hidden>
+  <section id="summaryViewPage" class="page" aria-labelledby="summaryViewHeading" hidden>
           <div class="page-heading">
             <div>
               <button class="btn btn-ghost back-button" id="backFromSummary">← Back</button>
@@ -372,7 +504,7 @@
           </div>
         </section>
 
-        <section id="settingsPage" class="page" aria-labelledby="settingsHeading" hidden>
+  <section id="settingsPage" class="page" aria-labelledby="settingsHeading" hidden>
           <div class="settings-layout">
             <aside class="settings-sidebar" aria-label="Settings navigation">
               <div class="settings-profile">
@@ -672,6 +804,7 @@
             </section>
           </div>
         </section>
+        </div>
       </main>
     </div>
   </div>
@@ -680,15 +813,15 @@
     <div class="modal-overlay" role="presentation"></div>
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="summaryModalHeading">
       <header class="modal-header">
-        <h2 id="summaryModalHeading">✨ Generated summaries</h2>
-        <button class="modal-close" onclick="closeSummaryModal()" aria-label="Close dialog">×</button>
+  <h2 id="summaryModalHeading">✨ Generated summaries</h2>
+  <button class="modal-close" data-action="close-summary-modal" aria-label="Close dialog">×</button>
       </header>
       <div class="modal-body">
         <p class="modal-description">Your document summaries are ready. Review each card to open the full view.</p>
         <div id="summaryCards" class="summary-cards-grid"></div>
       </div>
       <footer class="modal-footer">
-        <button class="btn btn-outline" onclick="closeSummaryModal()">Close</button>
+  <button class="btn btn-outline" data-action="close-summary-modal">Close</button>
       </footer>
     </div>
   </div>

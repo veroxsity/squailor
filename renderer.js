@@ -5,6 +5,8 @@ let selectedModel = localStorage.getItem('ai_model') || 'openai/gpt-4o-mini';  /
 let summaryHistory = [];
 let currentProvider = 'openrouter';
 const SUMMARY_PREVIEW_LIMIT = 600;
+let isProcessingBatch = false;
+let processingBatchSize = 0;
 
 // DOM Elements (removed legacy apiKey elements)
 const selectFilesBtn = document.getElementById('selectFiles');
@@ -15,6 +17,12 @@ const fileListDiv = document.getElementById('fileList');
 const resultsSection = document.getElementById('resultsSection');
 const resultsDiv = document.getElementById('results');
 const modelSelect = document.getElementById('modelSelect');
+const homeProviderBadge = document.getElementById('homeProviderBadge');
+const heroProviderAlert = document.getElementById('heroProviderAlert');
+const heroProviderCta = document.getElementById('heroProviderCta');
+const heroStatSummaries = document.getElementById('heroStatSummaries');
+const heroStatQueue = document.getElementById('heroStatQueue');
+const heroStatLastRun = document.getElementById('heroStatLastRun');
 const historyListDiv = document.getElementById('historyList');
 const emptyHistoryDiv = document.getElementById('emptyHistory');
 const clearHistoryBtn = document.getElementById('clearHistory');
@@ -25,6 +33,12 @@ const appSubtitle = document.getElementById('appSubtitle');
 const appContent = document.querySelector('.app-content');
 const queueCountEl = document.getElementById('queueCount');
 const queueTokensEl = document.getElementById('queueTokens');
+const statusProviderValue = document.getElementById('statusProviderValue');
+const statusProviderMeta = document.getElementById('statusProviderMeta');
+const statusQueueValue = document.getElementById('statusQueueValue');
+const statusQueueMeta = document.getElementById('statusQueueMeta');
+const statusNetworkValue = document.getElementById('statusNetworkValue');
+const statusNetworkMeta = document.getElementById('statusNetworkMeta');
 const railItems = Array.from(document.querySelectorAll('.rail-item'));
 const pageElements = {
   home: document.getElementById('homePage'),
@@ -223,13 +237,18 @@ async function populateModels(provider, hasApiKey) {
   const modelSelect = document.getElementById('modelSelect');
   const currentProviderLabel = document.getElementById('currentProviderLabel');
   
-  if (!modelSelect) return;
+  if (!modelSelect) {
+    updateHomeProviderBadge(provider, hasApiKey);
+    return;
+  }
   
   // Update provider label
   if (currentProviderLabel) {
     const displayName = providerDisplayNames[provider] || provider;
     currentProviderLabel.textContent = `Current provider: ${displayName}`;
   }
+
+  updateHomeProviderBadge(provider, hasApiKey);
   
   // If no API key, show message
   if (!hasApiKey) {
@@ -282,6 +301,108 @@ async function populateModels(provider, hasApiKey) {
   }
 }
 
+function updateHomeProviderBadge(provider, hasApiKey) {
+  if (!homeProviderBadge) return;
+  const displayName = providerDisplayNames[provider] || provider;
+  const text = hasApiKey ? `Provider: ${displayName}` : `Provider: ${displayName} (no key)`;
+  homeProviderBadge.textContent = text;
+  homeProviderBadge.classList.remove('success', 'warning');
+  homeProviderBadge.classList.add(hasApiKey ? 'success' : 'warning');
+  updateHeroProviderState(hasApiKey);
+}
+
+function updateHeroProviderState(hasApiKey) {
+  if (heroProviderAlert) {
+    heroProviderAlert.hidden = !!hasApiKey;
+  }
+  if (heroProviderCta) {
+    heroProviderCta.textContent = hasApiKey ? 'Manage providers' : 'Add API key';
+  }
+  if (statusProviderValue) {
+    const displayName = providerDisplayNames[currentProvider] || currentProvider;
+    statusProviderValue.textContent = displayName;
+  }
+  if (statusProviderMeta) {
+    statusProviderMeta.textContent = hasApiKey ? 'Connected' : 'Add API key';
+    statusProviderMeta.dataset.state = hasApiKey ? 'ok' : 'warn';
+  }
+}
+
+function updateHeroStats() {
+  if (heroStatSummaries) {
+    heroStatSummaries.textContent = summaryHistory.length ? summaryHistory.length.toString() : '—';
+  }
+  if (heroStatQueue) {
+    heroStatQueue.textContent = selectedFiles.length.toString();
+  }
+  if (heroStatLastRun) {
+    heroStatLastRun.textContent = formatHeroLastRun();
+  }
+}
+
+function updateQueueStatusChip() {
+  if (!statusQueueValue && !statusQueueMeta) return;
+  const queueCount = isProcessingBatch
+    ? Math.max(processingBatchSize, selectedFiles.length, 1)
+    : selectedFiles.length;
+  if (statusQueueValue) {
+    const label = queueCount === 1 ? 'file' : 'files';
+    statusQueueValue.textContent = `${queueCount} ${label}`;
+  }
+  if (statusQueueMeta) {
+    if (isProcessingBatch) {
+      statusQueueMeta.textContent = 'Processing…';
+      statusQueueMeta.dataset.state = 'busy';
+    } else if (selectedFiles.length > 0) {
+      statusQueueMeta.textContent = 'Ready to run';
+      statusQueueMeta.dataset.state = 'warn';
+    } else {
+      statusQueueMeta.textContent = 'Queue idle';
+      statusQueueMeta.dataset.state = 'idle';
+    }
+  }
+}
+
+function updateNetworkStatusChip() {
+  if (!statusNetworkValue && !statusNetworkMeta) return;
+  const online = navigator.onLine;
+  if (statusNetworkValue) {
+    statusNetworkValue.textContent = online ? 'Online' : 'Offline';
+  }
+  if (statusNetworkMeta) {
+    statusNetworkMeta.textContent = online ? 'All systems go' : 'Reconnect to run jobs';
+    statusNetworkMeta.dataset.state = online ? 'ok' : 'error';
+  }
+}
+
+updateQueueStatusChip();
+updateNetworkStatusChip();
+
+function formatHeroLastRun() {
+  if (!summaryHistory.length) return 'Not yet';
+  const latest = [...summaryHistory]
+    .filter(item => item && item.timestamp)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+  if (!latest) return 'Not yet';
+  const date = new Date(latest.timestamp);
+  if (Number.isNaN(date.getTime())) return 'Recently';
+  const diffMs = Date.now() - date.getTime();
+  const oneHour = 1000 * 60 * 60;
+  const oneDay = oneHour * 24;
+  const oneWeek = oneDay * 7;
+  if (diffMs < oneHour) {
+    const mins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    return `${mins}m ago`;
+  }
+  if (diffMs < oneDay) {
+    return `Today · ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  }
+  if (diffMs < oneWeek) {
+    return `${date.toLocaleDateString([], { weekday: 'short' })}`;
+  }
+  return date.toLocaleDateString();
+}
+
 function updateQueueStats() {
   if (queueCountEl) {
     queueCountEl.textContent = selectedFiles.length;
@@ -289,6 +410,8 @@ function updateQueueStats() {
   if (queueTokensEl) {
     queueTokensEl.textContent = selectedFiles.length ? 'Pending…' : '—';
   }
+  updateHeroStats();
+  updateQueueStatusChip();
 }
 
 // Initialize on load
@@ -298,6 +421,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (keyResult.success && keyResult.apiKey) {
     apiKey = keyResult.apiKey;
   }
+  updateHeroProviderState(!!apiKey);
+  updateHeroStats();
   
   // Load settings
   const settings = await window.electronAPI.getSettings();
@@ -618,6 +743,16 @@ function showToast(message, type = 'info', timeout = 4000) {
     setTimeout(() => container.removeChild(toast), 220);
   }, timeout);
 }
+
+window.addEventListener('online', () => {
+  updateNetworkStatusChip();
+  showToast('Back online. You can resume processing.', 'success', 3200);
+});
+
+window.addEventListener('offline', () => {
+  updateNetworkStatusChip();
+  showToast('You appear to be offline. Processing is paused until reconnection.', 'error', 4200);
+});
 
 // Confirm dialog helper (returns Promise<boolean>)
 function showConfirm(message) {
@@ -1285,13 +1420,95 @@ async function initDiagnosticsPanel() {
 async function loadDiagnostics() {
   try {
     const res = await window.electronAPI.getNetworkDiagnostics();
-    const hosts = (res && res.suspiciousHosts) || [];
-    if (diagCount) diagCount.textContent = `Entries: ${hosts.length}`;
+    const hostSummaries = (res && res.suspiciousHosts) || [];
+    const recentEvents = (res && res.recentEvents) || [];
+    const totals = (res && res.totals) || { hosts: hostSummaries.length, events: recentEvents.length };
+
+    if (diagCount) {
+      diagCount.textContent = `Hosts: ${totals.hosts ?? hostSummaries.length} • Events: ${totals.events ?? recentEvents.length}`;
+    }
+
     if (diagList) {
-      if (hosts.length === 0) {
+      if (hostSummaries.length === 0) {
         diagList.innerHTML = '<div style="opacity:.7">No suspicious hosts recorded.</div>';
       } else {
-        diagList.innerHTML = hosts.map(h => `<div>• ${escapeHtml(h)}</div>`).join('');
+        const formatTimestamp = ts => {
+          try {
+            const date = ts ? new Date(ts) : null;
+            return date && !Number.isNaN(date.valueOf()) ? date.toLocaleString() : 'Unknown';
+          } catch (_) {
+            return 'Unknown';
+          }
+        };
+
+        const renderSamplePaths = (paths = []) => {
+          if (!paths || !paths.length) return '<em>No sample paths</em>';
+          return `
+            <div class="diag-paths">
+              ${paths.map(p => `<code>${escapeHtml(p)}</code>`).join(' ')}
+            </div>
+          `;
+        };
+
+        const renderEventsTable = () => {
+          if (!recentEvents.length) return '';
+          const rows = recentEvents.slice(0, 25).map(ev => `
+            <tr>
+              <td>${escapeHtml(ev.method || 'GET')}</td>
+              <td>${escapeHtml(ev.host)}</td>
+              <td>${escapeHtml(ev.path || '/')}</td>
+              <td>${escapeHtml(ev.protocol || 'http')}</td>
+              <td>${escapeHtml(ev.port || '-')}</td>
+              <td>${formatTimestamp(ev.timestamp)}</td>
+            </tr>
+          `).join('');
+          return `
+            <div class="diag-events">
+              <div class="diag-table-heading">Recent events</div>
+              <div class="diag-table-wrapper">
+                <table class="diag-table">
+                  <thead>
+                    <tr>
+                      <th>Method</th>
+                      <th>Host</th>
+                      <th>Path</th>
+                      <th>Protocol</th>
+                      <th>Port</th>
+                      <th>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        };
+
+        diagList.innerHTML = `
+          <div class="diag-hosts">
+            ${hostSummaries.map(entry => `
+              <article class="diag-host-card">
+                <header>
+                  <div>
+                    <div class="diag-host">${escapeHtml(entry.host)}</div>
+                    <div class="diag-meta">${entry.count || 0} request${entry.count === 1 ? '' : 's'}</div>
+                  </div>
+                  <div class="diag-meta diag-timestamp">Last seen: ${formatTimestamp(entry.lastSeen)}</div>
+                </header>
+                <dl>
+                  <div><dt>First seen</dt><dd>${formatTimestamp(entry.firstSeen)}</dd></div>
+                  <div><dt>Protocol</dt><dd>${escapeHtml(entry.lastProtocol || 'Unknown')}</dd></div>
+                  <div><dt>Port</dt><dd>${escapeHtml(entry.lastPort || '—')}</dd></div>
+                </dl>
+                <div class="diag-sample-label">Sample paths</div>
+                ${renderSamplePaths(entry.samplePaths)}
+              </article>
+            `).join('')}
+          </div>
+          ${renderEventsTable()}
+        `;
       }
     }
   } catch (e) {
@@ -1565,6 +1782,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
       return;
     }
 
+    const combinedCap = (maxCombinedInput && parseInt(maxCombinedInput.value, 10)) || 3;
+
     // Disable button and show processing state
     processFilesBtn.disabled = true;
     processFilesBtn.innerHTML = '<span class="loading"></span> Processing...';
@@ -1581,6 +1800,12 @@ if (processFilesBtn && resultsDiv && resultsSection) {
     const summaryType = getSummaryType();
     const responseTone = getResponseTone();
     const summaryStyle = getSummaryStyle();  // Get the selected style
+    const runBatchSize = processCombined
+      ? Math.min(selectedFiles.length, combinedCap)
+      : selectedFiles.length;
+    isProcessingBatch = true;
+    processingBatchSize = runBatchSize;
+    updateQueueStatusChip();
     
     // Build index map for the current run and share with global listener
     currentFileIndexMap = new Map();
@@ -1591,9 +1816,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
 
     try {
       if (processCombined) {
-        const maxCombined = (maxCombinedInput && parseInt(maxCombinedInput.value, 10)) || 3;
         const combined = await window.electronAPI.processDocumentsCombined(
-          selectedFiles.slice(0, maxCombined),
+          selectedFiles.slice(0, combinedCap),
           summaryType,
           apiKey,
           responseTone,
@@ -1639,6 +1863,9 @@ if (processFilesBtn && resultsDiv && resultsSection) {
       processFilesBtn.disabled = false;
       processFilesBtn.innerHTML = '<span class="btn-icon">🚀</span><span>Generate Summaries</span>';
       updateQueueStats();
+      isProcessingBatch = false;
+      processingBatchSize = 0;
+      updateQueueStatusChip();
       if (queueTokensEl && selectedFiles.length === 0) {
         queueTokensEl.textContent = '—';
       }
@@ -2086,6 +2313,8 @@ function updateHistoryStats() {
     const uniqueFiles = new Set(summaryHistory.map(item => item.fileName)).size;
     totalDocumentsSpan.textContent = `${uniqueFiles} ${uniqueFiles === 1 ? 'document' : 'documents'}`;
   }
+
+  updateHeroStats();
 }
 
 async function deleteHistoryItem(index) {
@@ -2106,25 +2335,124 @@ async function deleteHistoryItem(index) {
   renderHistory();
 }
 
-function copyHistorySummary(index) {
+async function copyTextToClipboard(text, {
+  successMessage = 'Copied to clipboard.',
+  successVariant = 'success',
+  failureMessage = 'Unable to copy to clipboard. Please try again.'
+} = {}) {
+  const normalized = typeof text === 'string' ? text : '';
+  if (!normalized.trim()) {
+    showToast('There is no text available to copy yet.', 'info');
+    return false;
+  }
+
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(normalized);
+      if (successMessage) {
+        showToast(successMessage, successVariant);
+      }
+      return true;
+    } catch (err) {
+      console.warn('Clipboard API write failed; attempting fallback copy.', err);
+    }
+  }
+
+  const canExecCommand = typeof document.execCommand === 'function'
+    || (typeof document.queryCommandSupported === 'function' && document.queryCommandSupported('copy'));
+
+  if (canExecCommand) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = normalized;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+
+      const selection = document.getSelection && document.getSelection();
+      const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+      textarea.select();
+      const succeeded = document.execCommand && document.execCommand('copy');
+
+      document.body.removeChild(textarea);
+      if (previousRange && selection) {
+        try {
+          selection.removeAllRanges();
+          selection.addRange(previousRange);
+        } catch (_) {
+          // ignore selection restore errors
+        }
+      }
+
+      if (succeeded) {
+        if (successMessage) {
+          showToast(successMessage, successVariant);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn('Fallback clipboard copy failed.', err);
+    }
+  }
+
+  showToast(failureMessage, 'error');
+  return false;
+}
+
+async function shareSummaryText({ title, text }) {
+  const normalizedTitle = title || 'Summary';
+  const normalizedText = typeof text === 'string' ? text : '';
+  if (!normalizedText.trim()) {
+    showToast('There is no summary content available to share yet.', 'info');
+    return false;
+  }
+
+  const canUseNavigatorShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  if (canUseNavigatorShare) {
+    try {
+      await navigator.share({ title: normalizedTitle, text: normalizedText });
+      showToast('Share dialog opened. Complete the share in your OS window.', 'success');
+      return true;
+    } catch (err) {
+      if (err && (err.name === 'AbortError' || err.message === 'Share canceled')) {
+        showToast('Share canceled.', 'info');
+        return false;
+      }
+      console.warn('navigator.share failed; falling back to clipboard.', err);
+    }
+  }
+
+  return copyTextToClipboard(normalizedText, {
+    successMessage: 'Summary copied to clipboard so you can share it anywhere.',
+    successVariant: 'info',
+    failureMessage: 'Sharing isn\'t available here and automatic copying failed. Please copy the summary manually.'
+  });
+}
+
+async function copyHistorySummary(index) {
   const item = summaryHistory[index];
-  navigator.clipboard.writeText(item.summary).then(() => {
-    showToast('Summary copied to clipboard!', 'success');
-  }).catch(err => {
-    showToast('Failed to copy: ' + err.message, 'error');
+  if (!item || !item.summary) {
+    showToast('Summary content is not available yet.', 'info');
+    return;
+  }
+  await copyTextToClipboard(item.summary, {
+    successMessage: 'Summary copied to clipboard!',
+    failureMessage: 'Failed to copy summary to clipboard. Please try again.'
   });
 }
 
 // Copy summary from the completion modal results
-function copyResultSummary(event, index) {
+async function copyResultSummary(event, index) {
   // prevent parent card onclick from firing
   event.stopPropagation();
   const result = window.currentResults && window.currentResults[index];
-  if (!result || !result.success) return;
-  navigator.clipboard.writeText(result.summary).then(() => {
-    showToast('Summary copied to clipboard!', 'success');
-  }).catch(err => {
-    showToast('Failed to copy: ' + err.message, 'error');
+  if (!result || !result.success || !result.summary) return;
+  await copyTextToClipboard(result.summary, {
+    successMessage: 'Summary copied to clipboard!',
+    failureMessage: 'Failed to copy summary to clipboard. Please try again.'
   });
 }
 
@@ -2154,27 +2482,13 @@ function downloadResultSummary(event, index, format = 'txt') {
 }
 
 // Use Web Share API when available, otherwise fall back to copying link/text
-function shareResultSummary(event, index) {
+async function shareResultSummary(event, index) {
   event.stopPropagation();
   const result = window.currentResults && window.currentResults[index];
   if (!result || !result.success) return;
 
   const text = `Summary for ${result.fileName}\n\n${result.summary}`;
-  if (navigator.share) {
-    navigator.share({
-      title: `Summary: ${result.fileName}`,
-      text
-    }).catch(err => {
-      showToast('Share failed: ' + err.message, 'error');
-    });
-  } else {
-    // Fallback: copy to clipboard and notify user
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Summary copied to clipboard (share fallback).', 'info');
-    }).catch(err => {
-      showToast('Share not available and copy failed: ' + err.message, 'error');
-    });
-  }
+  await shareSummaryText({ title: `Summary: ${result.fileName}`, text });
 }
 
 function exportHistoryItem(index) {
@@ -2220,6 +2534,52 @@ ${item.summary}`;
 // Markdown parsing and sanitization are provided by preload (local libs)
 async function ensureMarkdownLibs() {
   return true;
+}
+
+function renderSummaryContent(contentDiv, summaryText) {
+  if (!contentDiv) return;
+  const text = typeof summaryText === 'string' ? summaryText : '';
+
+  // Attempt Markdown parsing + sanitization if helpers are loaded
+  const parseMarkdown = window.electronAPI && typeof window.electronAPI.parseMarkdown === 'function'
+    ? window.electronAPI.parseMarkdown
+    : null;
+  const sanitizeHtml = window.electronAPI && typeof window.electronAPI.sanitizeHtml === 'function'
+    ? window.electronAPI.sanitizeHtml
+    : null;
+
+  try {
+    if (parseMarkdown) {
+      const rawHtml = parseMarkdown(text) || '';
+      if (rawHtml) {
+        const safeHtml = sanitizeHtml ? (sanitizeHtml(rawHtml) || rawHtml) : rawHtml;
+        contentDiv.innerHTML = safeHtml;
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('Markdown parsing error:', err);
+  }
+
+  // Fallback: render plain text to avoid HTML injection.
+  contentDiv.innerHTML = '';
+  const normalized = text.trim();
+  if (!normalized) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No summary content available.';
+    empty.classList.add('text-muted');
+    contentDiv.appendChild(empty);
+    return;
+  }
+
+  normalized.split(/\n{2,}/).forEach(block => {
+    const paragraph = document.createElement('p');
+    // Preserve single line breaks within the paragraph for readability
+    paragraph.textContent = block.replace(/\n+/g, ' ').trim();
+    if (paragraph.textContent.length > 0) {
+      contentDiv.appendChild(paragraph);
+    }
+  });
 }
 
 async function viewFullSummary(index) {
@@ -2293,31 +2653,8 @@ async function viewFullSummary(index) {
       }
     }
   } catch (_) {}
-  // Parse and sanitize markdown using preload-provided helpers
-  try {
-    const rawHtml = (window.electronAPI && typeof window.electronAPI.parseMarkdown === 'function')
-      ? window.electronAPI.parseMarkdown(item.summary)
-      : null;
-    if (rawHtml) {
-      const safeHtml = (window.electronAPI && typeof window.electronAPI.sanitizeHtml === 'function')
-        ? (window.electronAPI.sanitizeHtml(rawHtml) || rawHtml)
-        : rawHtml;
-      contentDiv.innerHTML = safeHtml;
-    } else {
-      // Fallback to plain text with basic formatting
-      const formattedText = item.summary
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-        .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
-        .replace(/^- (.+)$/gm, '<li>$1</li>') // List items
-        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>') // Wrap in ul
-        .replace(/\n\n/g, '</p><p>') // Paragraphs
-        .replace(/^(.+)$/gm, '<p>$1</p>'); // Single paragraphs
-      contentDiv.innerHTML = formattedText;
-    }
-  } catch (error) {
-    console.error('Markdown parsing error:', error);
-    contentDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">${escapeHtml(item.summary)}</pre>`;
-  }
+  // Parse, sanitize, or safely fall back to plain text
+  renderSummaryContent(contentDiv, item.summary);
 
   // Setup Q&A chat for this summary
   setupSummaryQaChat(item);
@@ -2581,24 +2918,13 @@ if (exportSummaryTXTBtn) {
 }
 
 if (shareSummaryViewBtn) {
-  shareSummaryViewBtn.addEventListener('click', () => {
-    if (typeof window.currentSummaryIndex !== 'undefined') {
-      const idx = window.currentSummaryIndex;
-      const item = summaryHistory[idx];
-      if (!item) return;
-      const text = `Summary for ${item.fileName}\n\n${item.summary}`;
-      if (navigator.share) {
-        navigator.share({ title: `Summary: ${item.fileName}`, text }).catch(err => {
-          showToast('Share failed: ' + err.message, 'error');
-        });
-      } else {
-        navigator.clipboard.writeText(text).then(() => {
-          showToast('Summary copied to clipboard (share fallback).', 'info');
-        }).catch(err => {
-          showToast('Share not available and copy failed: ' + err.message, 'error');
-        });
-      }
-    }
+  shareSummaryViewBtn.addEventListener('click', async () => {
+    if (typeof window.currentSummaryIndex === 'undefined') return;
+    const idx = window.currentSummaryIndex;
+    const item = summaryHistory[idx];
+    if (!item) return;
+    const text = `Summary for ${item.fileName}\n\n${item.summary}`;
+    await shareSummaryText({ title: `Summary: ${item.fileName}`, text });
   });
 }
 
@@ -2751,14 +3077,17 @@ window.loadDocumentViewer = loadDocumentViewer;
 // Modal overlay click handler - close modal when clicking outside
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('summaryCompleteModal');
-  if (modal) {
-    const overlay = modal.querySelector('.modal-overlay');
-    if (overlay) {
-      overlay.addEventListener('click', () => {
-        closeSummaryModal();
-      });
-    }
+  if (!modal) return;
+
+  const overlay = modal.querySelector('.modal-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', closeSummaryModal);
   }
+
+  const closeButtons = modal.querySelectorAll('[data-action="close-summary-modal"]');
+  closeButtons.forEach(btn => {
+    btn.addEventListener('click', closeSummaryModal);
+  });
 });
 
 // --- Summary Q&A Chat ---
