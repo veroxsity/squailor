@@ -2477,6 +2477,20 @@ ipcMain.handle('get-network-diagnostics', async () => {
   }
 });
 
+// Clear network diagnostics list
+ipcMain.handle('clear-network-diagnostics', async () => {
+  try {
+    if (global.__suspiciousRequests) {
+      try { global.__suspiciousRequests.clear(); } catch (_) { global.__suspiciousRequests = new Set(); }
+    } else {
+      global.__suspiciousRequests = new Set();
+    }
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e && e.message };
+  }
+});
+
 // Fetch latest release metadata (version/path/sha512) without downloading installer
 ipcMain.handle('get-latest-release-info', async () => {
   try {

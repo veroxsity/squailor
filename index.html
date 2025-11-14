@@ -628,6 +628,21 @@
                           </ul>
                         </div>
                       </div>
+                      <hr style="border:none;border-top:1px solid #1f2937;margin:16px 0;opacity:.5;" />
+                      <div class="info-box">
+                        <div class="info-icon">🧭</div>
+                        <div class="info-content" style="width:100%">
+                          <strong>Network diagnostics</strong>
+                          <p>Hosts contacted outside the known allowlist are shown here to help identify unexpected network activity.</p>
+                          <div class="button-row" style="margin:8px 0;gap:8px;display:flex;flex-wrap:wrap;">
+                            <button id="diagRefreshBtn" class="btn btn-outline btn-small">Refresh</button>
+                            <button id="diagExportBtn" class="btn btn-outline btn-small">Export</button>
+                            <button id="diagClearBtn" class="btn btn-ghost btn-small">Clear</button>
+                            <span id="diagCount" class="status-inline"></span>
+                          </div>
+                          <div id="diagList" class="diagnostics-list" style="max-height:180px;overflow:auto;border:1px solid #1f2937;padding:8px;border-radius:8px;font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;font-size:12px;"></div>
+                        </div>
+                      </div>
                     </div>
                   </article>
                 </div>

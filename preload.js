@@ -73,5 +73,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onQaProgress: (folderId, callback) => ipcRenderer.on(`qa-progress:${folderId}`, (event, data) => callback(data)),
   offQaProgress: (folderId) => ipcRenderer.removeAllListeners(`qa-progress:${folderId}`),
   // Get models for a provider
-  getProviderModels: (provider) => ipcRenderer.invoke('get-provider-models', provider)
+  getProviderModels: (provider) => ipcRenderer.invoke('get-provider-models', provider),
+  // Network diagnostics
+  getNetworkDiagnostics: () => ipcRenderer.invoke('get-network-diagnostics'),
+  clearNetworkDiagnostics: () => ipcRenderer.invoke('clear-network-diagnostics')
 });

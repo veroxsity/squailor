@@ -197,6 +197,13 @@ const combinedHelperLabel = document.getElementById('combinedHelperLabel');
 const processImagesToggle = document.getElementById('processImagesToggle');
 let processImages = true;
 
+// Diagnostics elements
+const diagRefreshBtn = document.getElementById('diagRefreshBtn');
+const diagExportBtn = document.getElementById('diagExportBtn');
+const diagClearBtn = document.getElementById('diagClearBtn');
+const diagList = document.getElementById('diagList');
+const diagCount = document.getElementById('diagCount');
+
 // Provider display names
 const providerDisplayNames = {
   'openrouter': 'OpenRouter',
@@ -1064,7 +1071,70 @@ document.addEventListener('click', (e) => {
   if (t && t.matches && t.matches('.settings-nav-item[data-panel="updates"]')) {
     setTimeout(initUpdateSettingsPanel, 50);
   }
+  if (t && t.matches && t.matches('.settings-nav-item[data-panel="privacy"]')) {
+    setTimeout(initDiagnosticsPanel, 50);
+  }
 });
+
+async function initDiagnosticsPanel() {
+  try {
+    await loadDiagnostics();
+    if (diagRefreshBtn && !diagRefreshBtn.__bound) {
+      diagRefreshBtn.__bound = true;
+      diagRefreshBtn.addEventListener('click', loadDiagnostics);
+    }
+    if (diagClearBtn && !diagClearBtn.__bound) {
+      diagClearBtn.__bound = true;
+      diagClearBtn.addEventListener('click', async () => {
+        try { await window.electronAPI.clearNetworkDiagnostics(); } catch(_){}
+        await loadDiagnostics();
+      });
+    }
+    if (diagExportBtn && !diagExportBtn.__bound) {
+      diagExportBtn.__bound = true;
+      diagExportBtn.addEventListener('click', async () => {
+        const data = await window.electronAPI.getNetworkDiagnostics();
+        const payload = {
+          generatedAt: new Date().toISOString(),
+          count: (data && data.count) || 0,
+          suspiciousHosts: (data && data.suspiciousHosts) || []
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'squailor-network-diagnostics.json';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 200);
+      });
+    }
+  } catch (e) {
+    console.error('Diagnostics init failed', e);
+  }
+}
+
+async function loadDiagnostics() {
+  try {
+    const res = await window.electronAPI.getNetworkDiagnostics();
+    const hosts = (res && res.suspiciousHosts) || [];
+    if (diagCount) diagCount.textContent = `Entries: ${hosts.length}`;
+    if (diagList) {
+      if (hosts.length === 0) {
+        diagList.innerHTML = '<div style="opacity:.7">No suspicious hosts recorded.</div>';
+      } else {
+        diagList.innerHTML = hosts.map(h => `<div>• ${escapeHtml(h)}</div>`).join('');
+      }
+    }
+  } catch (e) {
+    if (diagList) diagList.textContent = 'Failed to load diagnostics';
+  }
+}
+
+function escapeHtml(str) {
+  if (typeof str !== 'string') return '';
+  return str.replace(/[&<>"]/g, s => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[s]));
+}
 
 // Manual update progress listeners
 if (window.electronAPI && window.electronAPI.onManualUpdateProgress) {
