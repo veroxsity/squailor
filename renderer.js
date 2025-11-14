@@ -5,6 +5,8 @@ let selectedModel = localStorage.getItem('ai_model') || 'openai/gpt-4o-mini';  /
 let summaryHistory = [];
 let currentProvider = 'openrouter';
 const SUMMARY_PREVIEW_LIMIT = 600;
+let isProcessingBatch = false;
+let processingBatchSize = 0;
 
 // DOM Elements (removed legacy apiKey elements)
 const selectFilesBtn = document.getElementById('selectFiles');
@@ -15,6 +17,12 @@ const fileListDiv = document.getElementById('fileList');
 const resultsSection = document.getElementById('resultsSection');
 const resultsDiv = document.getElementById('results');
 const modelSelect = document.getElementById('modelSelect');
+const homeProviderBadge = document.getElementById('homeProviderBadge');
+const heroProviderAlert = document.getElementById('heroProviderAlert');
+const heroProviderCta = document.getElementById('heroProviderCta');
+const heroStatSummaries = document.getElementById('heroStatSummaries');
+const heroStatQueue = document.getElementById('heroStatQueue');
+const heroStatLastRun = document.getElementById('heroStatLastRun');
 const historyListDiv = document.getElementById('historyList');
 const emptyHistoryDiv = document.getElementById('emptyHistory');
 const clearHistoryBtn = document.getElementById('clearHistory');
@@ -25,6 +33,12 @@ const appSubtitle = document.getElementById('appSubtitle');
 const appContent = document.querySelector('.app-content');
 const queueCountEl = document.getElementById('queueCount');
 const queueTokensEl = document.getElementById('queueTokens');
+const statusProviderValue = document.getElementById('statusProviderValue');
+const statusProviderMeta = document.getElementById('statusProviderMeta');
+const statusQueueValue = document.getElementById('statusQueueValue');
+const statusQueueMeta = document.getElementById('statusQueueMeta');
+const statusNetworkValue = document.getElementById('statusNetworkValue');
+const statusNetworkMeta = document.getElementById('statusNetworkMeta');
 const railItems = Array.from(document.querySelectorAll('.rail-item'));
 const pageElements = {
   home: document.getElementById('homePage'),
@@ -223,13 +237,18 @@ async function populateModels(provider, hasApiKey) {
   const modelSelect = document.getElementById('modelSelect');
   const currentProviderLabel = document.getElementById('currentProviderLabel');
   
-  if (!modelSelect) return;
+  if (!modelSelect) {
+    updateHomeProviderBadge(provider, hasApiKey);
+    return;
+  }
   
   // Update provider label
   if (currentProviderLabel) {
     const displayName = providerDisplayNames[provider] || provider;
     currentProviderLabel.textContent = `Current provider: ${displayName}`;
   }
+
+  updateHomeProviderBadge(provider, hasApiKey);
   
   // If no API key, show message
   if (!hasApiKey) {
@@ -282,6 +301,108 @@ async function populateModels(provider, hasApiKey) {
   }
 }
 
+function updateHomeProviderBadge(provider, hasApiKey) {
+  if (!homeProviderBadge) return;
+  const displayName = providerDisplayNames[provider] || provider;
+  const text = hasApiKey ? `Provider: ${displayName}` : `Provider: ${displayName} (no key)`;
+  homeProviderBadge.textContent = text;
+  homeProviderBadge.classList.remove('success', 'warning');
+  homeProviderBadge.classList.add(hasApiKey ? 'success' : 'warning');
+  updateHeroProviderState(hasApiKey);
+}
+
+function updateHeroProviderState(hasApiKey) {
+  if (heroProviderAlert) {
+    heroProviderAlert.hidden = !!hasApiKey;
+  }
+  if (heroProviderCta) {
+    heroProviderCta.textContent = hasApiKey ? 'Manage providers' : 'Add API key';
+  }
+  if (statusProviderValue) {
+    const displayName = providerDisplayNames[currentProvider] || currentProvider;
+    statusProviderValue.textContent = displayName;
+  }
+  if (statusProviderMeta) {
+    statusProviderMeta.textContent = hasApiKey ? 'Connected' : 'Add API key';
+    statusProviderMeta.dataset.state = hasApiKey ? 'ok' : 'warn';
+  }
+}
+
+function updateHeroStats() {
+  if (heroStatSummaries) {
+    heroStatSummaries.textContent = summaryHistory.length ? summaryHistory.length.toString() : '—';
+  }
+  if (heroStatQueue) {
+    heroStatQueue.textContent = selectedFiles.length.toString();
+  }
+  if (heroStatLastRun) {
+    heroStatLastRun.textContent = formatHeroLastRun();
+  }
+}
+
+function updateQueueStatusChip() {
+  if (!statusQueueValue && !statusQueueMeta) return;
+  const queueCount = isProcessingBatch
+    ? Math.max(processingBatchSize, selectedFiles.length, 1)
+    : selectedFiles.length;
+  if (statusQueueValue) {
+    const label = queueCount === 1 ? 'file' : 'files';
+    statusQueueValue.textContent = `${queueCount} ${label}`;
+  }
+  if (statusQueueMeta) {
+    if (isProcessingBatch) {
+      statusQueueMeta.textContent = 'Processing…';
+      statusQueueMeta.dataset.state = 'busy';
+    } else if (selectedFiles.length > 0) {
+      statusQueueMeta.textContent = 'Ready to run';
+      statusQueueMeta.dataset.state = 'warn';
+    } else {
+      statusQueueMeta.textContent = 'Queue idle';
+      statusQueueMeta.dataset.state = 'idle';
+    }
+  }
+}
+
+function updateNetworkStatusChip() {
+  if (!statusNetworkValue && !statusNetworkMeta) return;
+  const online = navigator.onLine;
+  if (statusNetworkValue) {
+    statusNetworkValue.textContent = online ? 'Online' : 'Offline';
+  }
+  if (statusNetworkMeta) {
+    statusNetworkMeta.textContent = online ? 'All systems go' : 'Reconnect to run jobs';
+    statusNetworkMeta.dataset.state = online ? 'ok' : 'error';
+  }
+}
+
+updateQueueStatusChip();
+updateNetworkStatusChip();
+
+function formatHeroLastRun() {
+  if (!summaryHistory.length) return 'Not yet';
+  const latest = [...summaryHistory]
+    .filter(item => item && item.timestamp)
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
+  if (!latest) return 'Not yet';
+  const date = new Date(latest.timestamp);
+  if (Number.isNaN(date.getTime())) return 'Recently';
+  const diffMs = Date.now() - date.getTime();
+  const oneHour = 1000 * 60 * 60;
+  const oneDay = oneHour * 24;
+  const oneWeek = oneDay * 7;
+  if (diffMs < oneHour) {
+    const mins = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+    return `${mins}m ago`;
+  }
+  if (diffMs < oneDay) {
+    return `Today · ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  }
+  if (diffMs < oneWeek) {
+    return `${date.toLocaleDateString([], { weekday: 'short' })}`;
+  }
+  return date.toLocaleDateString();
+}
+
 function updateQueueStats() {
   if (queueCountEl) {
     queueCountEl.textContent = selectedFiles.length;
@@ -289,6 +410,8 @@ function updateQueueStats() {
   if (queueTokensEl) {
     queueTokensEl.textContent = selectedFiles.length ? 'Pending…' : '—';
   }
+  updateHeroStats();
+  updateQueueStatusChip();
 }
 
 // Initialize on load
@@ -298,6 +421,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (keyResult.success && keyResult.apiKey) {
     apiKey = keyResult.apiKey;
   }
+  updateHeroProviderState(!!apiKey);
+  updateHeroStats();
   
   // Load settings
   const settings = await window.electronAPI.getSettings();
@@ -618,6 +743,16 @@ function showToast(message, type = 'info', timeout = 4000) {
     setTimeout(() => container.removeChild(toast), 220);
   }, timeout);
 }
+
+window.addEventListener('online', () => {
+  updateNetworkStatusChip();
+  showToast('Back online. You can resume processing.', 'success', 3200);
+});
+
+window.addEventListener('offline', () => {
+  updateNetworkStatusChip();
+  showToast('You appear to be offline. Processing is paused until reconnection.', 'error', 4200);
+});
 
 // Confirm dialog helper (returns Promise<boolean>)
 function showConfirm(message) {
@@ -1565,6 +1700,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
       return;
     }
 
+    const combinedCap = (maxCombinedInput && parseInt(maxCombinedInput.value, 10)) || 3;
+
     // Disable button and show processing state
     processFilesBtn.disabled = true;
     processFilesBtn.innerHTML = '<span class="loading"></span> Processing...';
@@ -1581,6 +1718,12 @@ if (processFilesBtn && resultsDiv && resultsSection) {
     const summaryType = getSummaryType();
     const responseTone = getResponseTone();
     const summaryStyle = getSummaryStyle();  // Get the selected style
+    const runBatchSize = processCombined
+      ? Math.min(selectedFiles.length, combinedCap)
+      : selectedFiles.length;
+    isProcessingBatch = true;
+    processingBatchSize = runBatchSize;
+    updateQueueStatusChip();
     
     // Build index map for the current run and share with global listener
     currentFileIndexMap = new Map();
@@ -1591,9 +1734,8 @@ if (processFilesBtn && resultsDiv && resultsSection) {
 
     try {
       if (processCombined) {
-        const maxCombined = (maxCombinedInput && parseInt(maxCombinedInput.value, 10)) || 3;
         const combined = await window.electronAPI.processDocumentsCombined(
-          selectedFiles.slice(0, maxCombined),
+          selectedFiles.slice(0, combinedCap),
           summaryType,
           apiKey,
           responseTone,
@@ -1639,6 +1781,9 @@ if (processFilesBtn && resultsDiv && resultsSection) {
       processFilesBtn.disabled = false;
       processFilesBtn.innerHTML = '<span class="btn-icon">🚀</span><span>Generate Summaries</span>';
       updateQueueStats();
+      isProcessingBatch = false;
+      processingBatchSize = 0;
+      updateQueueStatusChip();
       if (queueTokensEl && selectedFiles.length === 0) {
         queueTokensEl.textContent = '—';
       }
@@ -2086,6 +2231,8 @@ function updateHistoryStats() {
     const uniqueFiles = new Set(summaryHistory.map(item => item.fileName)).size;
     totalDocumentsSpan.textContent = `${uniqueFiles} ${uniqueFiles === 1 ? 'document' : 'documents'}`;
   }
+
+  updateHeroStats();
 }
 
 async function deleteHistoryItem(index) {
