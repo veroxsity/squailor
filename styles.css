@@ -1309,6 +1309,105 @@ body.light-theme .stat-card {
   gap: var(--space-3);
   align-items: flex-start;
 }
+.diag-hosts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.diag-hosts .diag-host-card {
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 10px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diag-host-card header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.diag-host-card .diag-host {
+  font-weight: 600;
+  font-family: ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+}
+
+.diag-host-card .diag-meta {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.diag-host-card dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.diag-host-card dl div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.diag-host-card dt {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(148, 163, 184, 0.8);
+}
+
+.diag-host-card dd {
+  margin: 0;
+  font-size: 13px;
+}
+
+.diag-paths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.diag-paths code {
+  background: rgba(15, 23, 42, 0.55);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-size: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+.diag-table-heading {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+}
+
+.diag-table-wrapper {
+  overflow: auto;
+}
+
+.diag-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.diag-table th,
+.diag-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  text-align: left;
+}
+
+.diag-table tbody tr:hover {
+  background: rgba(15, 23, 42, 0.4);
+}
 
 body.light-theme .guidance-card {
   background: rgba(255, 255, 255, 0.85);

@@ -1420,13 +1420,95 @@ async function initDiagnosticsPanel() {
 async function loadDiagnostics() {
   try {
     const res = await window.electronAPI.getNetworkDiagnostics();
-    const hosts = (res && res.suspiciousHosts) || [];
-    if (diagCount) diagCount.textContent = `Entries: ${hosts.length}`;
+    const hostSummaries = (res && res.suspiciousHosts) || [];
+    const recentEvents = (res && res.recentEvents) || [];
+    const totals = (res && res.totals) || { hosts: hostSummaries.length, events: recentEvents.length };
+
+    if (diagCount) {
+      diagCount.textContent = `Hosts: ${totals.hosts ?? hostSummaries.length} • Events: ${totals.events ?? recentEvents.length}`;
+    }
+
     if (diagList) {
-      if (hosts.length === 0) {
+      if (hostSummaries.length === 0) {
         diagList.innerHTML = '<div style="opacity:.7">No suspicious hosts recorded.</div>';
       } else {
-        diagList.innerHTML = hosts.map(h => `<div>• ${escapeHtml(h)}</div>`).join('');
+        const formatTimestamp = ts => {
+          try {
+            const date = ts ? new Date(ts) : null;
+            return date && !Number.isNaN(date.valueOf()) ? date.toLocaleString() : 'Unknown';
+          } catch (_) {
+            return 'Unknown';
+          }
+        };
+
+        const renderSamplePaths = (paths = []) => {
+          if (!paths || !paths.length) return '<em>No sample paths</em>';
+          return `
+            <div class="diag-paths">
+              ${paths.map(p => `<code>${escapeHtml(p)}</code>`).join(' ')}
+            </div>
+          `;
+        };
+
+        const renderEventsTable = () => {
+          if (!recentEvents.length) return '';
+          const rows = recentEvents.slice(0, 25).map(ev => `
+            <tr>
+              <td>${escapeHtml(ev.method || 'GET')}</td>
+              <td>${escapeHtml(ev.host)}</td>
+              <td>${escapeHtml(ev.path || '/')}</td>
+              <td>${escapeHtml(ev.protocol || 'http')}</td>
+              <td>${escapeHtml(ev.port || '-')}</td>
+              <td>${formatTimestamp(ev.timestamp)}</td>
+            </tr>
+          `).join('');
+          return `
+            <div class="diag-events">
+              <div class="diag-table-heading">Recent events</div>
+              <div class="diag-table-wrapper">
+                <table class="diag-table">
+                  <thead>
+                    <tr>
+                      <th>Method</th>
+                      <th>Host</th>
+                      <th>Path</th>
+                      <th>Protocol</th>
+                      <th>Port</th>
+                      <th>Timestamp</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${rows}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          `;
+        };
+
+        diagList.innerHTML = `
+          <div class="diag-hosts">
+            ${hostSummaries.map(entry => `
+              <article class="diag-host-card">
+                <header>
+                  <div>
+                    <div class="diag-host">${escapeHtml(entry.host)}</div>
+                    <div class="diag-meta">${entry.count || 0} request${entry.count === 1 ? '' : 's'}</div>
+                  </div>
+                  <div class="diag-meta diag-timestamp">Last seen: ${formatTimestamp(entry.lastSeen)}</div>
+                </header>
+                <dl>
+                  <div><dt>First seen</dt><dd>${formatTimestamp(entry.firstSeen)}</dd></div>
+                  <div><dt>Protocol</dt><dd>${escapeHtml(entry.lastProtocol || 'Unknown')}</dd></div>
+                  <div><dt>Port</dt><dd>${escapeHtml(entry.lastPort || '—')}</dd></div>
+                </dl>
+                <div class="diag-sample-label">Sample paths</div>
+                ${renderSamplePaths(entry.samplePaths)}
+              </article>
+            `).join('')}
+          </div>
+          ${renderEventsTable()}
+        `;
       }
     }
   } catch (e) {
@@ -2253,25 +2335,124 @@ async function deleteHistoryItem(index) {
   renderHistory();
 }
 
-function copyHistorySummary(index) {
+async function copyTextToClipboard(text, {
+  successMessage = 'Copied to clipboard.',
+  successVariant = 'success',
+  failureMessage = 'Unable to copy to clipboard. Please try again.'
+} = {}) {
+  const normalized = typeof text === 'string' ? text : '';
+  if (!normalized.trim()) {
+    showToast('There is no text available to copy yet.', 'info');
+    return false;
+  }
+
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    try {
+      await navigator.clipboard.writeText(normalized);
+      if (successMessage) {
+        showToast(successMessage, successVariant);
+      }
+      return true;
+    } catch (err) {
+      console.warn('Clipboard API write failed; attempting fallback copy.', err);
+    }
+  }
+
+  const canExecCommand = typeof document.execCommand === 'function'
+    || (typeof document.queryCommandSupported === 'function' && document.queryCommandSupported('copy'));
+
+  if (canExecCommand) {
+    try {
+      const textarea = document.createElement('textarea');
+      textarea.value = normalized;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'absolute';
+      textarea.style.left = '-9999px';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+
+      const selection = document.getSelection && document.getSelection();
+      const previousRange = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+      textarea.select();
+      const succeeded = document.execCommand && document.execCommand('copy');
+
+      document.body.removeChild(textarea);
+      if (previousRange && selection) {
+        try {
+          selection.removeAllRanges();
+          selection.addRange(previousRange);
+        } catch (_) {
+          // ignore selection restore errors
+        }
+      }
+
+      if (succeeded) {
+        if (successMessage) {
+          showToast(successMessage, successVariant);
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn('Fallback clipboard copy failed.', err);
+    }
+  }
+
+  showToast(failureMessage, 'error');
+  return false;
+}
+
+async function shareSummaryText({ title, text }) {
+  const normalizedTitle = title || 'Summary';
+  const normalizedText = typeof text === 'string' ? text : '';
+  if (!normalizedText.trim()) {
+    showToast('There is no summary content available to share yet.', 'info');
+    return false;
+  }
+
+  const canUseNavigatorShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  if (canUseNavigatorShare) {
+    try {
+      await navigator.share({ title: normalizedTitle, text: normalizedText });
+      showToast('Share dialog opened. Complete the share in your OS window.', 'success');
+      return true;
+    } catch (err) {
+      if (err && (err.name === 'AbortError' || err.message === 'Share canceled')) {
+        showToast('Share canceled.', 'info');
+        return false;
+      }
+      console.warn('navigator.share failed; falling back to clipboard.', err);
+    }
+  }
+
+  return copyTextToClipboard(normalizedText, {
+    successMessage: 'Summary copied to clipboard so you can share it anywhere.',
+    successVariant: 'info',
+    failureMessage: 'Sharing isn\'t available here and automatic copying failed. Please copy the summary manually.'
+  });
+}
+
+async function copyHistorySummary(index) {
   const item = summaryHistory[index];
-  navigator.clipboard.writeText(item.summary).then(() => {
-    showToast('Summary copied to clipboard!', 'success');
-  }).catch(err => {
-    showToast('Failed to copy: ' + err.message, 'error');
+  if (!item || !item.summary) {
+    showToast('Summary content is not available yet.', 'info');
+    return;
+  }
+  await copyTextToClipboard(item.summary, {
+    successMessage: 'Summary copied to clipboard!',
+    failureMessage: 'Failed to copy summary to clipboard. Please try again.'
   });
 }
 
 // Copy summary from the completion modal results
-function copyResultSummary(event, index) {
+async function copyResultSummary(event, index) {
   // prevent parent card onclick from firing
   event.stopPropagation();
   const result = window.currentResults && window.currentResults[index];
-  if (!result || !result.success) return;
-  navigator.clipboard.writeText(result.summary).then(() => {
-    showToast('Summary copied to clipboard!', 'success');
-  }).catch(err => {
-    showToast('Failed to copy: ' + err.message, 'error');
+  if (!result || !result.success || !result.summary) return;
+  await copyTextToClipboard(result.summary, {
+    successMessage: 'Summary copied to clipboard!',
+    failureMessage: 'Failed to copy summary to clipboard. Please try again.'
   });
 }
 
@@ -2301,27 +2482,13 @@ function downloadResultSummary(event, index, format = 'txt') {
 }
 
 // Use Web Share API when available, otherwise fall back to copying link/text
-function shareResultSummary(event, index) {
+async function shareResultSummary(event, index) {
   event.stopPropagation();
   const result = window.currentResults && window.currentResults[index];
   if (!result || !result.success) return;
 
   const text = `Summary for ${result.fileName}\n\n${result.summary}`;
-  if (navigator.share) {
-    navigator.share({
-      title: `Summary: ${result.fileName}`,
-      text
-    }).catch(err => {
-      showToast('Share failed: ' + err.message, 'error');
-    });
-  } else {
-    // Fallback: copy to clipboard and notify user
-    navigator.clipboard.writeText(text).then(() => {
-      showToast('Summary copied to clipboard (share fallback).', 'info');
-    }).catch(err => {
-      showToast('Share not available and copy failed: ' + err.message, 'error');
-    });
-  }
+  await shareSummaryText({ title: `Summary: ${result.fileName}`, text });
 }
 
 function exportHistoryItem(index) {
@@ -2751,24 +2918,13 @@ if (exportSummaryTXTBtn) {
 }
 
 if (shareSummaryViewBtn) {
-  shareSummaryViewBtn.addEventListener('click', () => {
-    if (typeof window.currentSummaryIndex !== 'undefined') {
-      const idx = window.currentSummaryIndex;
-      const item = summaryHistory[idx];
-      if (!item) return;
-      const text = `Summary for ${item.fileName}\n\n${item.summary}`;
-      if (navigator.share) {
-        navigator.share({ title: `Summary: ${item.fileName}`, text }).catch(err => {
-          showToast('Share failed: ' + err.message, 'error');
-        });
-      } else {
-        navigator.clipboard.writeText(text).then(() => {
-          showToast('Summary copied to clipboard (share fallback).', 'info');
-        }).catch(err => {
-          showToast('Share not available and copy failed: ' + err.message, 'error');
-        });
-      }
-    }
+  shareSummaryViewBtn.addEventListener('click', async () => {
+    if (typeof window.currentSummaryIndex === 'undefined') return;
+    const idx = window.currentSummaryIndex;
+    const item = summaryHistory[idx];
+    if (!item) return;
+    const text = `Summary for ${item.fileName}\n\n${item.summary}`;
+    await shareSummaryText({ title: `Summary: ${item.fileName}`, text });
   });
 }
 
