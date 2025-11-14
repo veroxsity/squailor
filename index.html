@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+  <a href="#mainContent" class="skip-link">Skip to main content</a>
   <div class="background-animation" aria-hidden="true">
     <div class="shape shape-1"></div>
     <div class="shape shape-2"></div>
@@ -74,7 +75,7 @@
         </div>
       </header>
 
-      <main class="app-content" tabindex="-1">
+      <main id="mainContent" class="app-content" tabindex="-1">
         <!-- ...existing content replaced with redesigned sections... -->
         <section id="homePage" class="page page-active" aria-labelledby="homeTitle">
           <div class="home-hero">
@@ -338,12 +339,12 @@
                   </div>
                 </div>
                 <div class="summary-quick-actions">
-                  <button class="btn btn-ghost" id="openTocBtn">☰ Outline</button>
+                  <button class="btn btn-ghost" id="openTocBtn" aria-controls="tocSidebar" aria-expanded="false">☰ Outline</button>
                   <button class="btn btn-outline btn-small" id="copySummaryView">Copy</button>
                   <button class="btn btn-outline btn-small" id="exportSummaryMD">Export MD</button>
                   <button class="btn btn-outline btn-small" id="exportSummaryTXT">Export TXT</button>
                   <button class="btn btn-outline btn-small" id="shareSummaryView">Share</button>
-                  <button class="btn btn-primary btn-small" id="openQaBtn">💬 Ask AI</button>
+                  <button class="btn btn-primary btn-small" id="openQaBtn" aria-controls="qaSidebar" aria-expanded="false">💬 Ask AI</button>
                 </div>
               </header>
               <div class="summary-panel-body">
@@ -365,7 +366,7 @@
                 <input id="qaInput" class="modern-input" type="text" placeholder="Ask a question about the summary..." autocomplete="off">
                 <button id="qaSendBtn" class="btn btn-primary">Ask</button>
               </div>
-              <div id="qaStatus" class="status-message" hidden></div>
+              <div id="qaStatus" class="status-message" hidden role="status" aria-live="polite"></div>
               <div class="panel-resizer qa-edge" id="qaResizerRight"></div>
             </aside>
           </div>
@@ -381,16 +382,16 @@
                   <span>AI Summarizer</span>
                 </div>
               </div>
-              <nav class="settings-nav">
+              <nav class="settings-nav" role="tablist" aria-label="Settings sections">
                 <p class="nav-group">App</p>
-                <button class="settings-nav-item active" data-panel="models">🤖 AI Providers</button>
-                <button class="settings-nav-item" data-panel="image">🖼️ Image Settings</button>
-                <button class="settings-nav-item" data-panel="appearance">🎨 Appearance</button>
-                <button class="settings-nav-item" data-panel="storage">💾 Storage</button>
-                <button class="settings-nav-item" data-panel="updates">⬆️ Updates <span id="updateReadyBadge" class="meta-badge" style="display:none; margin-left:6px;">Update ready</span></button>
-                <button class="settings-nav-item" data-panel="about">ℹ️ About</button>
+                <button id="tab-models" class="settings-nav-item active" data-panel="models" role="tab" aria-selected="true" aria-controls="panel-models">🤖 AI Providers</button>
+                <button id="tab-image" class="settings-nav-item" data-panel="image" role="tab" aria-selected="false" aria-controls="panel-image" tabindex="-1">🖼️ Image Settings</button>
+                <button id="tab-appearance" class="settings-nav-item" data-panel="appearance" role="tab" aria-selected="false" aria-controls="panel-appearance" tabindex="-1">🎨 Appearance</button>
+                <button id="tab-storage" class="settings-nav-item" data-panel="storage" role="tab" aria-selected="false" aria-controls="panel-storage" tabindex="-1">💾 Storage</button>
+                <button id="tab-updates" class="settings-nav-item" data-panel="updates" role="tab" aria-selected="false" aria-controls="panel-updates" tabindex="-1">⬆️ Updates <span id="updateReadyBadge" class="meta-badge" style="display:none; margin-left:6px;">Update ready</span></button>
+                <button id="tab-about" class="settings-nav-item" data-panel="about" role="tab" aria-selected="false" aria-controls="panel-about" tabindex="-1">ℹ️ About</button>
                 <p class="nav-group">Privacy</p>
-                <button class="settings-nav-item" data-panel="privacy">🔒 Privacy</button>
+                <button id="tab-privacy" class="settings-nav-item" data-panel="privacy" role="tab" aria-selected="false" aria-controls="panel-privacy" tabindex="-1">🔒 Privacy</button>
               </nav>
             </aside>
 
@@ -406,7 +407,7 @@
               </header>
 
               <div class="settings-panels" id="settingsPanels">
-                <div id="panel-models" class="settings-panel active">
+                <div id="panel-models" class="settings-panel active" role="tabpanel" aria-labelledby="tab-models">
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">🤖</div>
@@ -451,12 +452,12 @@
                         <button id="saveProviderBtn" class="btn btn-primary">Save settings</button>
                         <button id="deleteProviderKeyBtn" class="btn btn-ghost">Delete saved key</button>
                       </div>
-                      <div id="providerKeyStatus" class="status-message" style="margin-top: 8px;"></div>
+                      <div id="providerKeyStatus" class="status-message" style="margin-top: 8px;" role="status" aria-live="polite"></div>
                     </div>
                   </article>
                 </div>
 
-                <div id="panel-image" class="settings-panel">
+                <div id="panel-image" class="settings-panel" role="tabpanel" aria-labelledby="tab-image" hidden>
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">🖼️</div>
@@ -480,22 +481,26 @@
                         <span class="btn-icon">💾</span>
                         <span>Save settings</span>
                       </button>
-                      <div id="maxImagesStatus" class="status-message"></div>
+                      <div id="maxImagesStatus" class="status-message" role="status" aria-live="polite"></div>
                     </div>
                   </article>
                 </div>
 
-                <div id="panel-appearance" class="settings-panel">
+                <div id="panel-appearance" class="settings-panel" role="tabpanel" aria-labelledby="tab-appearance" hidden>
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">🎨</div>
                       <div>
                         <h3>Appearance</h3>
-                        <p>Switch between dark and light themes.</p>
+                        <p>Switch between system, dark, light, or high contrast themes.</p>
                       </div>
                     </header>
                     <div class="card-body">
                       <div class="theme-selector">
+                        <button class="theme-option" data-theme="system">
+                          <div class="theme-preview light"></div>
+                          <span>System</span>
+                        </button>
                         <button class="theme-option" data-theme="dark">
                           <div class="theme-preview dark"></div>
                           <span>Dark</span>
@@ -504,12 +509,16 @@
                           <div class="theme-preview light"></div>
                           <span>Light</span>
                         </button>
+                        <button class="theme-option" data-theme="high-contrast">
+                          <div class="theme-preview dark"></div>
+                          <span>High Contrast</span>
+                        </button>
                       </div>
                     </div>
                   </article>
                 </div>
 
-                <div id="panel-storage" class="settings-panel">
+                <div id="panel-storage" class="settings-panel" role="tabpanel" aria-labelledby="tab-storage" hidden>
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">💾</div>
@@ -545,7 +554,7 @@
                         <span class="btn-icon">💾</span>
                         <span>Apply location</span>
                       </button>
-                      <div id="storageStatus" class="status-message"></div>
+                      <div id="storageStatus" class="status-message" role="status" aria-live="polite"></div>
                       <div class="storage-stats">
                         <div><span>Files stored:</span> <strong id="statsFileCount">0</strong></div>
                         <div><span>Total size:</span> <strong id="statsTotalSize">0 MB</strong></div>
@@ -554,7 +563,7 @@
                   </article>
                 </div>
 
-                <div id="panel-updates" class="settings-panel">
+                <div id="panel-updates" class="settings-panel" role="tabpanel" aria-labelledby="tab-updates" hidden>
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">⬆️</div>
@@ -568,7 +577,7 @@
                         <button id="checkUpdatesBtn" class="btn btn-primary">Check for updates</button>
                         <button id="installUpdateBtn" class="btn btn-success" hidden>Restart & install</button>
                         <button id="applyOnRestartBtn" class="btn btn-outline" hidden>Apply on restart</button>
-                        <span id="updateStatus" class="status-inline"></span>
+                        <span id="updateStatus" class="status-inline" role="status" aria-live="polite"></span>
                       </div>
                       <div class="update-info" style="margin-top:12px;display:grid;gap:6px;font-size:13px;">
                         <div><strong>Current version:</strong> <span id="currentVersionValue">Loading...</span></div>
@@ -598,7 +607,7 @@
                   </article>
                 </div>
 
-                <div id="panel-about" class="settings-panel">
+                <div id="panel-about" class="settings-panel" role="tabpanel" aria-labelledby="tab-about" hidden>
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">ℹ️</div>
@@ -620,7 +629,7 @@
                   </article>
                 </div>
 
-                <div id="panel-privacy" class="settings-panel">
+                <div id="panel-privacy" class="settings-panel" role="tabpanel" aria-labelledby="tab-privacy" hidden>
                   <article class="card">
                     <header class="card-header">
                       <div class="card-icon">🔒</div>
@@ -672,7 +681,7 @@
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="summaryModalHeading">
       <header class="modal-header">
         <h2 id="summaryModalHeading">✨ Generated summaries</h2>
-        <button class="modal-close" onclick="closeSummaryModal()">×</button>
+        <button class="modal-close" onclick="closeSummaryModal()" aria-label="Close dialog">×</button>
       </header>
       <div class="modal-body">
         <p class="modal-description">Your document summaries are ready. Review each card to open the full view.</p>

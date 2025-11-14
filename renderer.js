@@ -338,7 +338,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     });
   }
   
-  // Apply theme
+  // Apply theme (including system preference)
   applyTheme(currentTheme);
   
   // Set model
@@ -634,22 +634,55 @@ function showConfirm(message) {
     modal.hidden = false;
     modal.classList.add('active');
 
+    // Accessibility: focus trap within modal
+    const content = modal.querySelector('.modal-content');
+    const previouslyFocused = document.activeElement;
+    const focusableSelectors = 'a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex]:not([tabindex="-1"])';
+    const getFocusable = () => Array.from(content.querySelectorAll(focusableSelectors)).filter(el => el.offsetParent !== null || el.getAttribute('aria-hidden') !== 'true');
+    const focusables = getFocusable();
+    const first = focusables[0] || okBtn;
+    const last = focusables[focusables.length - 1] || okBtn;
+    if (first && typeof first.focus === 'function') first.focus();
+
     function cleanup() {
       okBtn.removeEventListener('click', onOk);
       cancelBtn.removeEventListener('click', onCancel);
       window.removeEventListener('keydown', onKeydown);
+      content && content.removeEventListener('keydown', onTrap);
       modal.classList.remove('active');
       modal.hidden = true;
+      // Restore focus to the previously focused element
+      if (previouslyFocused && previouslyFocused.focus) {
+        previouslyFocused.focus();
+      }
     }
 
     function onOk() { cleanup(); resolve(true); }
     function onCancel() { cleanup(); resolve(false); }
     function onKeydown(e) { if (e.key === 'Escape') { cleanup(); resolve(false); } }
+    function onTrap(e) {
+      if (e.key !== 'Tab') return;
+      const els = getFocusable();
+      if (!els.length) return;
+      const firstEl = els[0];
+      const lastEl = els[els.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === firstEl) {
+          lastEl.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastEl) {
+          firstEl.focus();
+          e.preventDefault();
+        }
+      }
+    }
 
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
     window.addEventListener('keydown', onKeydown);
-    okBtn.focus();
+    content && content.addEventListener('keydown', onTrap);
   });
 }
 
@@ -761,21 +794,74 @@ document.addEventListener('DOMContentLoaded', () => {
   setSettingsPanelActive = (panelId, labelOverride) => {
     panels.forEach(p => p.classList.remove('active'));
     const active = document.getElementById(`panel-${panelId}`);
-    if (active) active.classList.add('active');
-    sidebarButtons.forEach(b => b.classList.remove('active'));
+    if (active) {
+      active.classList.add('active');
+      // Reflect tabpanel visibility for a11y
+      panels.forEach(p => {
+        if (p === active) {
+          p.hidden = false;
+          p.setAttribute('aria-hidden', 'false');
+        } else {
+          p.hidden = true;
+          p.setAttribute('aria-hidden', 'true');
+        }
+      });
+    }
+    sidebarButtons.forEach(b => {
+      b.classList.remove('active');
+      // Update ARIA for tabs
+      if (b.dataset && b.dataset.panel === panelId) {
+        b.classList.add('active');
+        b.setAttribute('aria-selected', 'true');
+        b.removeAttribute('tabindex');
+      } else {
+        b.setAttribute('aria-selected', 'false');
+        b.setAttribute('tabindex', '-1');
+      }
+    });
     const btn = Array.from(sidebarButtons).find(b => b.dataset.panel === panelId);
-    if (btn) btn.classList.add('active');
     const computedLabel = labelOverride || btn?.textContent?.replace(/^[^A-Za-z0-9]+\s*/, '') || 'Settings';
     if (titleEl) titleEl.textContent = computedLabel;
     if (subtitleEl) subtitleEl.textContent = panelCopy[panelId] || panelCopy.models;
 
     // No special header action needed anymore
     if (headerAction) headerAction.style.display = 'none';
+
+    // Move focus to the active tab for keyboard users
+    if (btn && typeof btn.focus === 'function') {
+      btn.focus();
+    }
   };
 
   sidebarButtons.forEach(btn => {
     btn.addEventListener('click', () => setSettingsPanelActive(btn.dataset.panel));
   });
+
+  // Keyboard navigation for tablist (Up/Down and Left/Right, Home/End)
+  const tablist = document.querySelector('.settings-nav[role="tablist"]');
+  if (tablist) {
+    tablist.addEventListener('keydown', (e) => {
+      const tabs = Array.from(document.querySelectorAll('.settings-nav-item[role="tab"]'));
+      const currentIndex = tabs.findIndex(t => t.classList.contains('active'));
+      let nextIndex = currentIndex;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        nextIndex = (currentIndex + 1) % tabs.length;
+      } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+      } else if (e.key === 'Home') {
+        nextIndex = 0;
+      } else if (e.key === 'End') {
+        nextIndex = tabs.length - 1;
+      } else {
+        return; // ignore other keys
+      }
+      e.preventDefault();
+      const targetTab = tabs[nextIndex];
+      if (targetTab) {
+        setSettingsPanelActive(targetTab.dataset.panel);
+      }
+    });
+  }
 
   // Ensure default active
   if (pendingSettingsPanel) {
@@ -788,16 +874,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Theme Management
 function applyTheme(theme) {
-  document.body.className = `${theme}-theme`;
+  // Support 'system' theme which follows OS preference
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const resolved = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
+
+  document.body.className = `${resolved}-theme`;
   // Also reflect theme on the <html> element so root scrollbars pick it up
   const root = document.documentElement;
   if (root) {
-    root.classList.remove('dark-theme', 'light-theme');
-    root.classList.add(`${theme}-theme`);
+    root.classList.remove('dark-theme', 'light-theme', 'high-contrast-theme');
+    root.classList.add(`${resolved}-theme`);
   }
   currentTheme = theme;
   localStorage.setItem('app_theme', theme);
-  
+  try { window.electronAPI.saveSettings && window.electronAPI.saveSettings({ theme }); } catch (_) {}
+
   // Update theme selector
   document.querySelectorAll('.theme-option').forEach(option => {
     if (option.dataset.theme === theme) {
@@ -806,6 +897,17 @@ function applyTheme(theme) {
       option.classList.remove('active');
     }
   });
+
+  // React to system changes when 'system' is selected
+  if (theme === 'system' && window.matchMedia) {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    if (!window.__themeMqBound) {
+      window.__themeMqBound = true;
+      mq.addEventListener('change', () => {
+        applyTheme('system');
+      });
+    }
+  }
 }
 
 // Theme selector
@@ -1706,6 +1808,41 @@ function showSummaryCompletionModal(results) {
   // Show modal
   modal.hidden = false;
   modal.classList.add('active');
+
+  // Accessibility: focus trap and restore focus
+  const content = modal.querySelector('.modal-content');
+  const closeBtn = modal.querySelector('.modal-close');
+  const previouslyFocused = document.activeElement;
+  const focusableSelectors = 'a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex]:not([tabindex="-1"])';
+  const getFocusable = () => Array.from(content.querySelectorAll(focusableSelectors)).filter(el => el.offsetParent !== null || el.getAttribute('aria-hidden') !== 'true');
+  const setInitialFocus = () => {
+    const els = getFocusable();
+    if (els.length) {
+      (closeBtn || els[0]).focus();
+    }
+  };
+  setInitialFocus();
+  function onTrap(e) {
+    if (e.key !== 'Tab') return;
+    const els = getFocusable();
+    if (!els.length) return;
+    const firstEl = els[0];
+    const lastEl = els[els.length - 1];
+    if (e.shiftKey) {
+      if (document.activeElement === firstEl) {
+        lastEl.focus();
+        e.preventDefault();
+      }
+    } else {
+      if (document.activeElement === lastEl) {
+        firstEl.focus();
+        e.preventDefault();
+      }
+    }
+  }
+  content && content.addEventListener('keydown', onTrap);
+  modal.__restoreFocus = () => { previouslyFocused && previouslyFocused.focus && previouslyFocused.focus(); };
+  modal.__removeTrap = () => { content && content.removeEventListener('keydown', onTrap); };
 }
 
 // Close summary modal
@@ -1714,6 +1851,9 @@ window.closeSummaryModal = function() {
   if (modal) {
     modal.classList.remove('active');
     modal.hidden = true;
+    // Remove trap and restore focus
+    if (modal.__removeTrap) try { modal.__removeTrap(); } catch(_){}
+    if (modal.__restoreFocus) try { modal.__restoreFocus(); } catch(_){}
   }
 };
 
@@ -2229,6 +2369,7 @@ async function viewFullSummary(index) {
     split.style.setProperty('--qa-col', Math.max(260, Math.min(width, 600)) + 'px');
     split.style.setProperty('--qa-resizer-col', '6px');
     localStorage.setItem('ui.qaOpen', 'true');
+    try { document.getElementById('openQaBtn')?.setAttribute('aria-expanded', 'true'); } catch(_){}
     setTimeout(() => document.getElementById('qaInput')?.focus(), 0);
   }
   function closeQaPanel() {
@@ -2238,6 +2379,7 @@ async function viewFullSummary(index) {
     qaSidebar.style.display = 'none';
     qaResizer.style.display = 'none';
     localStorage.setItem('ui.qaOpen', 'false');
+    try { document.getElementById('openQaBtn')?.setAttribute('aria-expanded', 'false'); } catch(_){}
   }
   if (openQaBtn && split && qaSidebar && qaResizer) {
     openQaBtn.onclick = openQaPanel;
@@ -2264,6 +2406,7 @@ async function viewFullSummary(index) {
     split.style.setProperty('--toc-col', Math.max(220, Math.min(width, Math.round(window.innerWidth * 0.4))) + 'px');
     split.style.setProperty('--toc-resizer-col', '6px');
     localStorage.setItem('ui.tocOpen', 'true');
+    try { document.getElementById('openTocBtn')?.setAttribute('aria-expanded', 'true'); } catch(_){}
   }
   function closeTocPanel() {
     if (!tocSidebar || !tocResizer || !split) return;
@@ -2272,6 +2415,7 @@ async function viewFullSummary(index) {
     tocSidebar.style.display = 'none';
     tocResizer.style.display = 'none';
     localStorage.setItem('ui.tocOpen', 'false');
+    try { document.getElementById('openTocBtn')?.setAttribute('aria-expanded', 'false'); } catch(_){}
   }
   if (openTocBtn && split && tocSidebar && tocResizer) {
     openTocBtn.onclick = openTocPanel;

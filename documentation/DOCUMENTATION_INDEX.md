@@ -46,6 +46,11 @@ Welcome to Squailor's documentation! This index will help you find the informati
   - Security considerations
   - File structure examples
 
+- **[UI_UX_UPDATE_CHECKLIST.md](UI_UX_UPDATE_CHECKLIST.md)** - Comprehensive UI/UX refresh checklist
+  - Phased approach (audit → design system → flows → accessibility → rollout)
+  - Accessibility and platform conventions
+  - Theming, components, performance, testing, and release
+
 ### Testing
 - **[TESTING_CHECKLIST.md](TESTING_CHECKLIST.md)** - Comprehensive testing guide
   - Pre-testing setup
