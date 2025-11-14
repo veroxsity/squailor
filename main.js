@@ -81,16 +81,19 @@ function attachAutoUpdaterListeners(autoUpdater, log) {
   try { logStartup('autoUpdaterListenersAttached'); } catch (_) {}
 
   autoUpdater.on('checking-for-update', () => {
+    try { logStartup('phase:update-checking'); } catch(_){}
     safeSend(mainWindow, 'update-checking');
     safeSend(splashWindow, 'update-checking');
   });
   autoUpdater.on('update-available', (info) => {
+    try { logStartup('phase:update-available:' + (info && info.version)); } catch(_){}
     safeSend(mainWindow, 'update-available', info);
     safeSend(splashWindow, 'update-available', info);
     try { logStartup('update-available-event:' + info.version); } catch (_) {}
     startUpdateSlowWatch(autoUpdater);
   });
   autoUpdater.on('update-not-available', (info) => {
+    try { logStartup('phase:update-not-available'); } catch(_){}
     safeSend(mainWindow, 'update-not-available', info);
     safeSend(splashWindow, 'update-not-available', info);
     // Ensure splash goes away promptly if no update
@@ -98,6 +101,7 @@ function attachAutoUpdaterListeners(autoUpdater, log) {
     clearUpdateSlowWatch();
   });
   autoUpdater.on('error', (err) => {
+    try { logStartup('phase:update-error:' + (err && err.message)); } catch(_){}
     safeSend(mainWindow, 'update-error', { message: err && err.message });
     safeSend(splashWindow, 'update-error', { message: err && err.message });
     scheduleSplashClose();
@@ -106,7 +110,10 @@ function attachAutoUpdaterListeners(autoUpdater, log) {
   autoUpdater.on('download-progress', (progress) => {
     try {
       const now = Date.now();
-      if (!updateDownloadStartTs) updateDownloadStartTs = now;
+      if (!updateDownloadStartTs) {
+        updateDownloadStartTs = now;
+        try { logStartup('phase:download-start'); } catch(_){}
+      }
       const elapsedMs = now - updateDownloadStartTs;
       const elapsedSec = elapsedMs / 1000;
       // electron-updater provides bytesPerSecond, percent, transferred, total
@@ -137,6 +144,7 @@ function attachAutoUpdaterListeners(autoUpdater, log) {
     }
   });
   autoUpdater.on('update-downloaded', (info) => {
+    try { logStartup('phase:download-end:' + (info && info.version)); } catch(_){}
     safeSend(mainWindow, 'update-downloaded', info);
     safeSend(splashWindow, 'update-downloaded', info);
     clearUpdateSlowWatch();
@@ -2227,6 +2235,7 @@ ipcMain.handle('clear-summary-history', async () => {
 ipcMain.handle('check-for-updates', async () => {
   try {
     const { autoUpdater } = require('electron-updater');
+    try { logStartup('phase:check-for-updates:ipc'); } catch(_){}
     await autoUpdater.checkForUpdates();
     return { success: true };
   } catch (err) {
@@ -2237,6 +2246,7 @@ ipcMain.handle('check-for-updates', async () => {
 ipcMain.handle('install-update', async (event, restartImmediately = true) => {
   try {
     const { autoUpdater } = require('electron-updater');
+    try { logStartup('phase:install-trigger:ipc:' + (restartImmediately ? 'restart-now' : 'restart-later')); } catch(_){}
     // Parameters: isSilent, isForceRunAfter
     // Perform diagnostics and try to close windows prior to install
     try {
@@ -2286,6 +2296,7 @@ ipcMain.handle('manual-download-update', async () => {
     const https = require('https');
     const os = require('os');
     const crypto = require('crypto');
+    try { logStartup('phase:manual-download:start'); } catch(_){}
     const tmpDir = os.tmpdir();
     const owner = 'veroxsity';
     const repo = 'Squailor';
@@ -2330,6 +2341,7 @@ ipcMain.handle('manual-download-update', async () => {
       https.get(downloadUrl, (res) => {
         if (res.statusCode !== 200) {
           safeSend(mainWindow, 'manual-update-error', { message: 'Installer download failed: ' + res.statusCode });
+          try { logStartup('phase:manual-download:error:http-' + res.statusCode); } catch(_){}
           return reject(new Error('HTTP ' + res.statusCode));
         }
         total = parseInt(res.headers['content-length'] || '0', 10) || 0;
@@ -2359,18 +2371,22 @@ ipcMain.handle('manual-download-update', async () => {
         });
         res.on('error', (e) => {
           safeSend(mainWindow, 'manual-update-error', { message: e.message });
+          try { logStartup('phase:manual-download:error:' + e.message); } catch(_){}
           reject(e);
         });
       }).on('error', (e) => {
         safeSend(mainWindow, 'manual-update-error', { message: e.message });
+        try { logStartup('phase:manual-download:error:' + e.message); } catch(_){}
         reject(e);
       });
     });
     const actualSha512 = hash.digest('base64');
     if (actualSha512 !== expectedSha512) {
       safeSend(mainWindow, 'manual-update-verify-failed', { expected: expectedSha512, actual: actualSha512 });
+      try { logStartup('phase:manual-download:verify-failed'); } catch(_){}
       return { success: false, error: 'SHA512 mismatch' };
     }
+    try { logStartup('phase:manual-download:complete'); } catch(_){}
     safeSend(mainWindow, 'manual-update-complete', { path: outPath, version });
     // Install: destroy windows, spawn installer, exit
     try {
@@ -2378,13 +2394,16 @@ ipcMain.handle('manual-download-update', async () => {
       const { spawn } = require('child_process');
       const child = spawn(outPath, [], { detached: true, stdio: 'ignore' });
       child.unref();
+      try { logStartup('phase:manual-install:spawned'); } catch(_){}
       setTimeout(() => { try { app.quit(); } catch(_){}; setTimeout(()=>{ try { process.exit(0); } catch(_){} }, 1200); }, 400);
     } catch (e) {
       safeSend(mainWindow, 'manual-update-error', { message: 'Installer launch failed: ' + e.message });
+      try { logStartup('phase:manual-install:error:' + e.message); } catch(_){}
       return { success: false, error: e.message };
     }
     return { success: true };
   } catch (err) {
+    try { logStartup('phase:manual-download:error:' + (err && err.message)); } catch(_){}
     return { success: false, error: err && err.message };
   }
 });
