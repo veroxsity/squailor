@@ -219,17 +219,33 @@ async function runBlockingUpdateCheck(timeoutMs = 15000) {
         resolve(allowStart);
       };
 
-      // If an update is available: wait for download then install immediately
+      // If an update is available: wait for download, then install immediately only if user prefers
       autoUpdater.once('update-available', (info) => {
         log.info('Blocking flow - update available:', info.version);
         try { logStartup('update-available:' + info.version); } catch (e) {}
         safeSend(splashWindow, 'update-available', info);
 
-        autoUpdater.once('update-downloaded', (downloadedInfo) => {
+  autoUpdater.once('update-downloaded', async (downloadedInfo) => {
           log.info('Blocking flow - update downloaded:', downloadedInfo.version);
           try { logStartup('update-downloaded:' + downloadedInfo.version); } catch (e) {}
           safeSend(splashWindow, 'update-downloaded', downloadedInfo);
           try {
+            // Read user preference for applying updates immediately vs on restart
+            let preferImmediate = true;
+            try {
+              const s = await loadSettings();
+              preferImmediate = !!s.autoApplyUpdates;
+            } catch (_) { /* default to immediate */ }
+
+            if (!preferImmediate) {
+              // Respect staged-apply preference: do NOT quit now; allow app to start
+              // Update will install on the next app quit (autoInstallOnAppQuit)
+              try { logStartup('blockingDeferredApply'); } catch (_) {}
+              // Close splash shortly and continue startup
+              scheduleSplashClose();
+              finish(true);
+              return;
+            }
             // Write diagnostics: current process info and running processes to help debug "cannot be closed" installer dialogs
             try {
               const procName = path.basename(process.execPath);
@@ -657,7 +673,7 @@ function createMainWindow() {
       'github.com',
       'fonts.googleapis.com',
       'fonts.gstatic.com',
-      'jsdelivr.net'
+  // jsdelivr no longer used after bundling markdown libs locally
     ];
     if (!global.__suspiciousRequests) {
       global.__suspiciousRequests = new Set();
@@ -783,6 +799,8 @@ app.whenReady().then(async () => {
       autoUpdater.logger = log;
       autoUpdater.logger.transports.file.level = 'info';
       autoUpdater.autoDownload = true; // set to false if you prefer manual download
+      // Ensure downloaded updates apply on next app quit when not installed immediately
+      try { autoUpdater.autoInstallOnAppQuit = true; } catch (_) {}
 
       // Configure update feed if using generic provider
       try {

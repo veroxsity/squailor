@@ -22,6 +22,7 @@ try { OpenAI = require('openai'); } catch { OpenAI = null; }
 const REPO_ROOT = process.cwd();
 const NOTES_PATH = path.join(REPO_ROOT, 'RELEASE_NOTES.md');
 const CONFIG_PATH = path.join(REPO_ROOT, '.github', 'release-notes.config.json');
+const PERF_PATH = path.join(REPO_ROOT, 'perf-metrics.json');
 
 function sh(cmd) {
   return execSync(cmd, { encoding: 'utf8' }).trim();
@@ -69,6 +70,51 @@ function getDiffStat(range) {
   return safeSh(`git diff --shortstat ${range}`);
 }
 
+function readJson(file) {
+  try { return JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
+}
+
+function readJsonAtRef(ref, filePath) {
+  try {
+    const data = sh(`git show ${ref}:${filePath.replace(/\\/g, '/')}`);
+    return JSON.parse(data);
+  } catch {
+    return null;
+  }
+}
+
+function getDependencyDiffs(prevRef) {
+  if (!prevRef) return { deps: [], devDeps: [] };
+  const currentPkg = readJson(path.join(REPO_ROOT, 'package.json')) || {};
+  const prevPkg = readJsonAtRef(prevRef, 'package.json') || {};
+  const sections = [
+    { key: 'dependencies', title: 'deps' },
+    { key: 'devDependencies', title: 'devDeps' },
+  ];
+  const result = { deps: [], devDeps: [] };
+  for (const s of sections) {
+    const cur = currentPkg[s.key] || {};
+    const old = prevPkg[s.key] || {};
+    const names = new Set([...Object.keys(cur), ...Object.keys(old)]);
+    for (const name of names) {
+      const before = old[name];
+      const after = cur[name];
+      if (!before && after) result[s.title].push({ name, change: 'added', before: null, after });
+      else if (before && !after) result[s.title].push({ name, change: 'removed', before, after: null });
+      else if (before !== after) result[s.title].push({ name, change: 'updated', before, after });
+    }
+  }
+  return result;
+}
+
+function loadPerfMetrics() {
+  // Optional, user-provided metrics (e.g., from CI or local runs)
+  const j = readJson(PERF_PATH);
+  if (!j) return null;
+  // Expected shape example: { startupMs: 1234, updateDownloadMbps: 12.3 }
+  return j;
+}
+
 function loadConfig() {
   if (fs.existsSync(CONFIG_PATH)) {
     try { return JSON.parse(fs.readFileSync(CONFIG_PATH, 'utf8')); } catch {}
@@ -90,7 +136,7 @@ function loadConfig() {
   };
 }
 
-async function callAI({ commits, diffStat, currentRef, prevTag, config }) {
+async function callAI({ commits, diffStat, currentRef, prevTag, config, depDiffs, perf }) {
   if (!OpenAI) throw new Error('openai package not installed');
   const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('Missing OPENROUTER_API_KEY (or OPENAI_API_KEY)');
@@ -127,6 +173,12 @@ Repo signals:
 - Diff summary: ${diffStat || 'n/a'}
 - Commits (JSON):
 ${JSON.stringify(commits).slice(0, 120000)}
+
+- Dependency changes (JSON):
+${JSON.stringify(depDiffs).slice(0, 20000)}
+
+- Performance metrics (JSON):
+${JSON.stringify(perf || {}).slice(0, 2000)}
 `;
 
   const res = await client.chat.completions.create({
@@ -144,7 +196,7 @@ ${JSON.stringify(commits).slice(0, 120000)}
   return content;
 }
 
-function fallbackNotes({ currentRef, prevTag, commits, config }) {
+function fallbackNotes({ currentRef, prevTag, commits, config, depDiffs, perf }) {
   const lines = [];
   lines.push(`## ${config.title}`);
   lines.push(prevTag ? `_Changes since ${prevTag}_\n` : `_Recent changes_\n`);
@@ -165,6 +217,24 @@ function fallbackNotes({ currentRef, prevTag, commits, config }) {
       lines.push(`- ${txt}`);
     }
   }
+
+  // Dependency diffs
+  const allDepChanges = [...(depDiffs?.deps || []), ...(depDiffs?.devDeps || [])];
+  if (allDepChanges.length) {
+    lines.push(`\n## Dependency updates`);
+    for (const d of allDepChanges) {
+      if (d.change === 'added') lines.push(`- Added ${d.name}@${d.after}`);
+      else if (d.change === 'removed') lines.push(`- Removed ${d.name}@${d.before}`);
+      else if (d.change === 'updated') lines.push(`- ${d.name}: ${d.before} → ${d.after}`);
+    }
+  }
+
+  // Optional performance metrics
+  if (perf && (perf.startupMs || perf.updateDownloadMbps)) {
+    lines.push(`\n## Performance`);
+    if (perf.startupMs) lines.push(`- Startup time baseline: ~${perf.startupMs} ms`);
+    if (perf.updateDownloadMbps) lines.push(`- Update download speed baseline: ~${perf.updateDownloadMbps} MB/s`);
+  }
   return lines.join('\n');
 }
 
@@ -175,14 +245,16 @@ async function main() {
   const range = prevTag ? `${prevTag}..${currentRef}` : '';
   const commits = getCommitData(range);
   const diffStat = getDiffStat(range);
+  const depDiffs = getDependencyDiffs(prevTag);
+  const perf = loadPerfMetrics();
   const config = loadConfig();
 
   let md = '';
   try {
-    md = await callAI({ commits, diffStat, currentRef, prevTag, config });
+    md = await callAI({ commits, diffStat, currentRef, prevTag, config, depDiffs, perf });
   } catch (err) {
     console.warn('[release-notes] AI generation failed, using fallback:', err.message);
-    md = fallbackNotes({ currentRef, prevTag, commits, config });
+    md = fallbackNotes({ currentRef, prevTag, commits, config, depDiffs, perf });
   }
 
   fs.writeFileSync(NOTES_PATH, md, 'utf8');

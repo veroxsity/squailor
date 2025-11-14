@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; connect-src 'self' https://* http://*;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com data:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; script-src 'self' 'unsafe-inline'; connect-src 'self' https://* http://*;">
   <title>Squailor - AI Document Summarizer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -387,7 +387,7 @@
                 <button class="settings-nav-item" data-panel="image">🖼️ Image Settings</button>
                 <button class="settings-nav-item" data-panel="appearance">🎨 Appearance</button>
                 <button class="settings-nav-item" data-panel="storage">💾 Storage</button>
-                <button class="settings-nav-item" data-panel="updates">⬆️ Updates</button>
+                <button class="settings-nav-item" data-panel="updates">⬆️ Updates <span id="updateReadyBadge" class="meta-badge" style="display:none; margin-left:6px;">Update ready</span></button>
                 <button class="settings-nav-item" data-panel="about">ℹ️ About</button>
                 <p class="nav-group">Privacy</p>
                 <button class="settings-nav-item" data-panel="privacy">🔒 Privacy</button>
@@ -567,6 +567,7 @@
                       <div class="update-actions">
                         <button id="checkUpdatesBtn" class="btn btn-primary">Check for updates</button>
                         <button id="installUpdateBtn" class="btn btn-success" hidden>Restart & install</button>
+                        <button id="applyOnRestartBtn" class="btn btn-outline" hidden>Apply on restart</button>
                         <span id="updateStatus" class="status-inline"></span>
                       </div>
                       <div class="update-info" style="margin-top:12px;display:grid;gap:6px;font-size:13px;">

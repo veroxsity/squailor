@@ -855,6 +855,7 @@ async function loadStorageSettings() {
 // Update UI elements for updater
 const checkUpdatesBtn = document.getElementById('checkUpdatesBtn');
 const installUpdateBtn = document.getElementById('installUpdateBtn');
+const applyOnRestartBtn = document.getElementById('applyOnRestartBtn');
 const updateStatusDiv = document.getElementById('updateStatus');
 const currentVersionValue = document.getElementById('currentVersionValue');
 const latestVersionValue = document.getElementById('latestVersionValue');
@@ -895,16 +896,29 @@ if (installUpdateBtn) {
   });
 }
 
+// Apply on restart: do not quit now; just inform the user
+if (applyOnRestartBtn) {
+  applyOnRestartBtn.addEventListener('click', async () => {
+    try {
+      if (updateStatusDiv) updateStatusDiv.textContent = 'Update will install on next restart.';
+    } catch (_) {}
+  });
+}
+
 // Updater event handlers from preload (emits from main)
 if (window.electronAPI && window.electronAPI.onUpdateChecking) {
   window.electronAPI.onUpdateChecking(() => {
     if (updateStatusDiv) updateStatusDiv.textContent = 'Checking for updates...';
     if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+    if (applyOnRestartBtn) applyOnRestartBtn.style.display = 'none';
+    const badge = document.getElementById('updateReadyBadge');
+    if (badge) badge.style.display = 'none';
   });
 
   window.electronAPI.onUpdateAvailable((info) => {
     if (updateStatusDiv) updateStatusDiv.textContent = `Update available: ${info.version} — downloading...`;
     if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+    if (applyOnRestartBtn) applyOnRestartBtn.style.display = 'none';
     if (latestVersionValue) latestVersionValue.textContent = info.version;
   });
 
@@ -928,6 +942,20 @@ if (window.electronAPI && window.electronAPI.onUpdateChecking) {
   window.electronAPI.onUpdateDownloaded((info) => {
     if (updateStatusDiv) updateStatusDiv.textContent = `Update downloaded: ${info.version}`;
     if (installUpdateBtn) installUpdateBtn.style.display = 'inline-block';
+    if (applyOnRestartBtn) {
+      if (autoApplyUpdatesToggle && autoApplyUpdatesToggle.checked) {
+        applyOnRestartBtn.style.display = 'none';
+      } else {
+        applyOnRestartBtn.style.display = 'inline-block';
+      }
+    }
+    // Show a small badge in settings nav to indicate readiness
+    try {
+      const badge = document.getElementById('updateReadyBadge');
+      if (badge && !(autoApplyUpdatesToggle && autoApplyUpdatesToggle.checked)) {
+        badge.style.display = '';
+      }
+    } catch (_) {}
     // Auto apply if setting enabled
     try {
       if (autoApplyUpdatesToggle && autoApplyUpdatesToggle.checked) {
@@ -940,11 +968,17 @@ if (window.electronAPI && window.electronAPI.onUpdateChecking) {
   window.electronAPI.onUpdateNotAvailable(() => {
     if (updateStatusDiv) updateStatusDiv.textContent = 'No updates available';
     if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+    if (applyOnRestartBtn) applyOnRestartBtn.style.display = 'none';
+    const badge = document.getElementById('updateReadyBadge');
+    if (badge) badge.style.display = 'none';
   });
 
   window.electronAPI.onUpdateError((err) => {
     if (updateStatusDiv) updateStatusDiv.textContent = `Update error: ${err && err.message}`;
     if (installUpdateBtn) installUpdateBtn.style.display = 'none';
+    if (applyOnRestartBtn) applyOnRestartBtn.style.display = 'none';
+    const badge = document.getElementById('updateReadyBadge');
+    if (badge) badge.style.display = 'none';
   });
 
   // Fallback: stalled download detection
@@ -2043,51 +2077,9 @@ ${item.summary}`;
   URL.revokeObjectURL(url);
 }
 
-// Lazy-load markdown libraries only when needed (summary view)
-const MARKED_CDN = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
-const DOMPURIFY_CDN = 'https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js';
-
-function loadScriptOnce(src) {
-  return new Promise((resolve, reject) => {
-    // If already present, resolve immediately
-    const existing = Array.from(document.getElementsByTagName('script')).find(s => s.src === src);
-    if (existing) {
-      if (existing.dataset.loaded === 'true') return resolve();
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = src;
-    script.async = true;
-    script.addEventListener('load', () => {
-      script.dataset.loaded = 'true';
-      resolve();
-    });
-    script.addEventListener('error', () => reject(new Error('Failed to load ' + src)));
-    document.head.appendChild(script);
-  });
-}
-
-async function ensureMarkdownLibs(timeoutMs = 6000) {
-  // If both are present, nothing to do
-  const hasMarked = typeof window.marked !== 'undefined' && typeof window.marked.parse === 'function';
-  const hasPurify = typeof window.DOMPurify !== 'undefined' && typeof window.DOMPurify.sanitize === 'function';
-  if (hasMarked && hasPurify) return true;
-
-  const timer = new Promise((_, reject) => setTimeout(() => reject(new Error('Markdown libs load timeout')), timeoutMs));
-  try {
-    // Load marked first, then DOMPurify; tolerate one missing and fall back later
-    await Promise.race([loadScriptOnce(MARKED_CDN), timer]);
-  } catch (_) {
-    // ignore, we'll fall back to plain rendering
-  }
-  try {
-    await Promise.race([loadScriptOnce(DOMPURIFY_CDN), timer]);
-  } catch (_) {
-    // ignore, sanitization will be skipped with warning
-  }
-  return (typeof window.marked !== 'undefined');
+// Markdown parsing and sanitization are provided by preload (local libs)
+async function ensureMarkdownLibs() {
+  return true;
 }
 
 async function viewFullSummary(index) {
@@ -2161,37 +2153,18 @@ async function viewFullSummary(index) {
       }
     }
   } catch (_) {}
-  // Ensure markdown libraries are present (will no-op if already loaded)
-  await ensureMarkdownLibs().catch(() => {});
-
+  // Parse and sanitize markdown using preload-provided helpers
   try {
-    // Check if marked is available
-    if (typeof marked !== 'undefined' && marked.parse) {
-      // Configure marked for better rendering
-      marked.setOptions({
-        breaks: true,
-        gfm: true,
-        headerIds: true,
-        mangle: false
-      });
-      
-      const htmlContent = marked.parse(item.summary);
-      // Sanitize HTML to prevent XSS from model output (e.g., scripts, iframes)
-      try {
-        if (typeof DOMPurify !== 'undefined' && DOMPurify.sanitize) {
-          const sanitized = DOMPurify.sanitize(htmlContent, { USE_PROFILES: { html: true } });
-          contentDiv.innerHTML = sanitized;
-        } else {
-          console.warn('DOMPurify not available, injecting unsanitized HTML');
-          contentDiv.innerHTML = htmlContent; // fallback
-        }
-      } catch (sanError) {
-        console.error('Sanitization error, reverting to escaped text:', sanError);
-        contentDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">${escapeHtml(item.summary)}</pre>`;
-      }
+    const rawHtml = (window.electronAPI && typeof window.electronAPI.parseMarkdown === 'function')
+      ? window.electronAPI.parseMarkdown(item.summary)
+      : null;
+    if (rawHtml) {
+      const safeHtml = (window.electronAPI && typeof window.electronAPI.sanitizeHtml === 'function')
+        ? (window.electronAPI.sanitizeHtml(rawHtml) || rawHtml)
+        : rawHtml;
+      contentDiv.innerHTML = safeHtml;
     } else {
       // Fallback to plain text with basic formatting
-      console.warn('marked library not loaded, using fallback rendering');
       const formattedText = item.summary
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
         .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
@@ -2203,7 +2176,6 @@ async function viewFullSummary(index) {
     }
   } catch (error) {
     console.error('Markdown parsing error:', error);
-    // Fallback to pre-formatted text
     contentDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">${escapeHtml(item.summary)}</pre>`;
   }
 

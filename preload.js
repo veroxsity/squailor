@@ -1,4 +1,25 @@
 const { contextBridge, ipcRenderer } = require('electron');
+// Local markdown and sanitization helpers (no CDN)
+let markedParse = null;
+let sanitizeHtml = null;
+try {
+  // marked v16 CommonJS default export exposes .parse
+  const marked = require('marked');
+  if (marked && typeof marked.setOptions === 'function' && typeof marked.parse === 'function') {
+    marked.setOptions({ breaks: true, gfm: true, headerIds: true, mangle: false });
+    markedParse = (md) => marked.parse(md || '');
+  }
+} catch (_) {}
+try {
+  // dompurify factory, bound to the window from renderer context
+  const createDOMPurify = require('dompurify');
+  if (typeof window !== 'undefined' && createDOMPurify) {
+    const DOMPurify = createDOMPurify(window);
+    if (DOMPurify && typeof DOMPurify.sanitize === 'function') {
+      sanitizeHtml = (html) => DOMPurify.sanitize(html || '', { USE_PROFILES: { html: true } });
+    }
+  }
+} catch (_) {}
 
 contextBridge.exposeInMainWorld('electronAPI', {
   selectFile: () => ipcRenderer.invoke('select-file'),
@@ -77,4 +98,20 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Network diagnostics
   getNetworkDiagnostics: () => ipcRenderer.invoke('get-network-diagnostics'),
   clearNetworkDiagnostics: () => ipcRenderer.invoke('clear-network-diagnostics')
+  ,
+  // Markdown + Sanitization (local)
+  parseMarkdown: (markdown) => {
+    try {
+      return markedParse ? markedParse(markdown) : null;
+    } catch (e) {
+      return null;
+    }
+  },
+  sanitizeHtml: (html) => {
+    try {
+      return sanitizeHtml ? sanitizeHtml(html) : null;
+    } catch (e) {
+      return null;
+    }
+  }
 });
