@@ -2237,6 +2237,9 @@ ipcMain.handle('get-summary-history', async () => {
 // Delete summary from history by folder ID
 ipcMain.handle('delete-summary-from-history', async (event, folderId) => {
   try {
+    if (!validators.isValidFolderId(folderId)) {
+      return { success: false, error: 'Invalid folder id' };
+    }
     const folderPath = path.join(documentsStoragePath, folderId);
     
     // Delete entire folder (contains document + summary.json)

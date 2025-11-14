@@ -2369,6 +2369,52 @@ async function ensureMarkdownLibs() {
   return true;
 }
 
+function renderSummaryContent(contentDiv, summaryText) {
+  if (!contentDiv) return;
+  const text = typeof summaryText === 'string' ? summaryText : '';
+
+  // Attempt Markdown parsing + sanitization if helpers are loaded
+  const parseMarkdown = window.electronAPI && typeof window.electronAPI.parseMarkdown === 'function'
+    ? window.electronAPI.parseMarkdown
+    : null;
+  const sanitizeHtml = window.electronAPI && typeof window.electronAPI.sanitizeHtml === 'function'
+    ? window.electronAPI.sanitizeHtml
+    : null;
+
+  try {
+    if (parseMarkdown) {
+      const rawHtml = parseMarkdown(text) || '';
+      if (rawHtml) {
+        const safeHtml = sanitizeHtml ? (sanitizeHtml(rawHtml) || rawHtml) : rawHtml;
+        contentDiv.innerHTML = safeHtml;
+        return;
+      }
+    }
+  } catch (err) {
+    console.error('Markdown parsing error:', err);
+  }
+
+  // Fallback: render plain text to avoid HTML injection.
+  contentDiv.innerHTML = '';
+  const normalized = text.trim();
+  if (!normalized) {
+    const empty = document.createElement('p');
+    empty.textContent = 'No summary content available.';
+    empty.classList.add('text-muted');
+    contentDiv.appendChild(empty);
+    return;
+  }
+
+  normalized.split(/\n{2,}/).forEach(block => {
+    const paragraph = document.createElement('p');
+    // Preserve single line breaks within the paragraph for readability
+    paragraph.textContent = block.replace(/\n+/g, ' ').trim();
+    if (paragraph.textContent.length > 0) {
+      contentDiv.appendChild(paragraph);
+    }
+  });
+}
+
 async function viewFullSummary(index) {
   const item = summaryHistory[index];
   
@@ -2440,31 +2486,8 @@ async function viewFullSummary(index) {
       }
     }
   } catch (_) {}
-  // Parse and sanitize markdown using preload-provided helpers
-  try {
-    const rawHtml = (window.electronAPI && typeof window.electronAPI.parseMarkdown === 'function')
-      ? window.electronAPI.parseMarkdown(item.summary)
-      : null;
-    if (rawHtml) {
-      const safeHtml = (window.electronAPI && typeof window.electronAPI.sanitizeHtml === 'function')
-        ? (window.electronAPI.sanitizeHtml(rawHtml) || rawHtml)
-        : rawHtml;
-      contentDiv.innerHTML = safeHtml;
-    } else {
-      // Fallback to plain text with basic formatting
-      const formattedText = item.summary
-        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
-        .replace(/\*(.*?)\*/g, '<em>$1</em>') // Italic
-        .replace(/^- (.+)$/gm, '<li>$1</li>') // List items
-        .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>') // Wrap in ul
-        .replace(/\n\n/g, '</p><p>') // Paragraphs
-        .replace(/^(.+)$/gm, '<p>$1</p>'); // Single paragraphs
-      contentDiv.innerHTML = formattedText;
-    }
-  } catch (error) {
-    console.error('Markdown parsing error:', error);
-    contentDiv.innerHTML = `<pre style="white-space: pre-wrap; font-family: inherit; line-height: 1.8;">${escapeHtml(item.summary)}</pre>`;
-  }
+  // Parse, sanitize, or safely fall back to plain text
+  renderSummaryContent(contentDiv, item.summary);
 
   // Setup Q&A chat for this summary
   setupSummaryQaChat(item);
@@ -2898,14 +2921,17 @@ window.loadDocumentViewer = loadDocumentViewer;
 // Modal overlay click handler - close modal when clicking outside
 document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('summaryCompleteModal');
-  if (modal) {
-    const overlay = modal.querySelector('.modal-overlay');
-    if (overlay) {
-      overlay.addEventListener('click', () => {
-        closeSummaryModal();
-      });
-    }
+  if (!modal) return;
+
+  const overlay = modal.querySelector('.modal-overlay');
+  if (overlay) {
+    overlay.addEventListener('click', closeSummaryModal);
   }
+
+  const closeButtons = modal.querySelectorAll('[data-action="close-summary-modal"]');
+  closeButtons.forEach(btn => {
+    btn.addEventListener('click', closeSummaryModal);
+  });
 });
 
 // --- Summary Q&A Chat ---

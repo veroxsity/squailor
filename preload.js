@@ -1,4 +1,5 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const validators = require('./utils/validators');
 // Local markdown and sanitization helpers (no CDN)
 let markedParse = null;
 let sanitizeHtml = null;
@@ -42,17 +43,33 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('delete-api-key'),
   // Provider-aware credentials management
   saveProviderCredentials: (provider, apiKey, config) =>
-    ipcRenderer.invoke('save-provider-credentials', { provider, apiKey, config }),
+    ipcRenderer.invoke('save-provider-credentials', {
+      provider: validators.sanitizeProvider(provider),
+      apiKey,
+      config: (config && typeof config === 'object') ? config : {}
+    }),
   loadProviderCredentials: (provider) =>
-    ipcRenderer.invoke('load-provider-credentials', provider),
+    ipcRenderer.invoke('load-provider-credentials', validators.sanitizeProvider(provider)),
   deleteProviderCredentials: (provider) =>
-    ipcRenderer.invoke('delete-provider-credentials', provider),
-  readStoredFile: (storedFileName) =>
-    ipcRenderer.invoke('read-stored-file', storedFileName),
-  checkFileExists: (storedFileName) =>
-    ipcRenderer.invoke('check-file-exists', storedFileName),
-  deleteStoredFile: (storedFileName) =>
-    ipcRenderer.invoke('delete-stored-file', storedFileName),
+    ipcRenderer.invoke('delete-provider-credentials', validators.sanitizeProvider(provider)),
+  readStoredFile: (folderId) => {
+    if (!validators.isValidFolderId(folderId)) {
+      return Promise.resolve({ success: false, error: 'Invalid folder id' });
+    }
+    return ipcRenderer.invoke('read-stored-file', folderId);
+  },
+  checkFileExists: (folderId) => {
+    if (!validators.isValidFolderId(folderId)) {
+      return Promise.resolve({ exists: false });
+    }
+    return ipcRenderer.invoke('check-file-exists', folderId);
+  },
+  deleteStoredFile: (folderId) => {
+    if (!validators.isValidFolderId(folderId)) {
+      return Promise.resolve({ success: false, error: 'Invalid folder id' });
+    }
+    return ipcRenderer.invoke('delete-stored-file', folderId);
+  },
   getStoragePaths: () =>
     ipcRenderer.invoke('get-storage-paths'),
   getSettings: () =>
@@ -65,8 +82,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('get-storage-stats'),
   getSummaryHistory: () =>
     ipcRenderer.invoke('get-summary-history'),
-  deleteSummaryFromHistory: (index) =>
-    ipcRenderer.invoke('delete-summary-from-history', index),
+  deleteSummaryFromHistory: (folderId) => {
+    if (!validators.isValidFolderId(folderId)) {
+      return Promise.resolve({ success: false, error: 'Invalid folder id' });
+    }
+    return ipcRenderer.invoke('delete-summary-from-history', folderId);
+  },
   clearSummaryHistory: () =>
     ipcRenderer.invoke('clear-summary-history'),
   onProcessingProgress: (callback) => 
@@ -90,11 +111,31 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getAppVersion: () => ipcRenderer.invoke('get-app-version'),
   getLatestReleaseInfo: () => ipcRenderer.invoke('get-latest-release-info'),
   // Q&A about a summary
-  askSummaryQuestion: (folderId, question, apiKey, model) => ipcRenderer.invoke('qa-summary', { folderId, question, apiKey, model }),
-  onQaProgress: (folderId, callback) => ipcRenderer.on(`qa-progress:${folderId}`, (event, data) => callback(data)),
-  offQaProgress: (folderId) => ipcRenderer.removeAllListeners(`qa-progress:${folderId}`),
+  askSummaryQuestion: (folderId, question, apiKey, model) => {
+    if (!validators.isValidFolderId(folderId)) {
+      return Promise.resolve({ success: false, error: 'Invalid folder id' });
+    }
+    const safeQuestion = (typeof question === 'string') ? question.trim() : '';
+    if (!safeQuestion) {
+      return Promise.resolve({ success: false, error: 'Question is required' });
+    }
+    return ipcRenderer.invoke('qa-summary', { folderId, question: safeQuestion, apiKey, model });
+  },
+  onQaProgress: (folderId, callback) => {
+    if (!validators.isValidFolderId(folderId) || typeof callback !== 'function') {
+      return () => {};
+    }
+    const channel = `qa-progress:${folderId}`;
+    const listener = (event, data) => callback(data);
+    ipcRenderer.on(channel, listener);
+    return () => ipcRenderer.removeListener(channel, listener);
+  },
+  offQaProgress: (folderId) => {
+    if (!validators.isValidFolderId(folderId)) return;
+    ipcRenderer.removeAllListeners(`qa-progress:${folderId}`);
+  },
   // Get models for a provider
-  getProviderModels: (provider) => ipcRenderer.invoke('get-provider-models', provider),
+  getProviderModels: (provider) => ipcRenderer.invoke('get-provider-models', validators.sanitizeProvider(provider)),
   // Network diagnostics
   getNetworkDiagnostics: () => ipcRenderer.invoke('get-network-diagnostics'),
   clearNetworkDiagnostics: () => ipcRenderer.invoke('clear-network-diagnostics')
