@@ -43,3 +43,7 @@ premium-plan/
 Squailor.code-workspace
 
 __tests__/
+
+.github/
+
+upgrade.md
