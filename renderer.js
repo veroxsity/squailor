@@ -861,6 +861,9 @@ const latestVersionValue = document.getElementById('latestVersionValue');
 const autoApplyUpdatesToggle = document.getElementById('autoApplyUpdatesToggle');
 const updateProgressDetails = document.getElementById('updateProgressDetails');
 const manualDownloadBtn = document.getElementById('manualDownloadBtn');
+const updateProviderSelect = document.getElementById('updateProviderSelect');
+const updateGenericUrlInput = document.getElementById('updateGenericUrlInput');
+const genericUrlRow = document.getElementById('genericUrlRow');
 
 if (checkUpdatesBtn) {
   checkUpdatesBtn.addEventListener('click', async () => {
@@ -1047,13 +1050,17 @@ async function initUpdateSettingsPanel() {
       const v = await window.electronAPI.getAppVersion();
       currentVersionValue.textContent = v;
     }
-    if (latestVersionValue) {
-      const meta = await window.electronAPI.getLatestReleaseInfo();
-      if (meta && meta.success && meta.version) latestVersionValue.textContent = meta.version; else latestVersionValue.textContent = '—';
-    }
+    await refreshLatestVersionLabel();
     const settings = await window.electronAPI.getSettings();
     if (autoApplyUpdatesToggle && settings && typeof settings.autoApplyUpdates === 'boolean') {
       autoApplyUpdatesToggle.checked = settings.autoApplyUpdates;
+    }
+    if (updateProviderSelect) {
+      updateProviderSelect.value = settings.updateProvider || 'github';
+      if (genericUrlRow) genericUrlRow.style.display = (updateProviderSelect.value === 'generic') ? 'block' : 'none';
+    }
+    if (updateGenericUrlInput) {
+      updateGenericUrlInput.value = settings.updateGenericUrl || '';
     }
     if (autoApplyUpdatesToggle) {
       autoApplyUpdatesToggle.addEventListener('change', async () => {
@@ -1062,7 +1069,32 @@ async function initUpdateSettingsPanel() {
         await window.electronAPI.saveSettings({ autoApplyUpdates: s.autoApplyUpdates });
       });
     }
+    if (updateProviderSelect) {
+      updateProviderSelect.addEventListener('change', async () => {
+        const provider = updateProviderSelect.value;
+        if (genericUrlRow) genericUrlRow.style.display = (provider === 'generic') ? 'block' : 'none';
+        await window.electronAPI.saveSettings({ updateProvider: provider });
+        await refreshLatestVersionLabel();
+      });
+    }
+    if (updateGenericUrlInput) {
+      updateGenericUrlInput.addEventListener('change', async () => {
+        const url = updateGenericUrlInput.value.trim();
+        await window.electronAPI.saveSettings({ updateGenericUrl: url });
+        await refreshLatestVersionLabel();
+      });
+    }
   } catch (e) { console.error('Failed update settings init', e); }
+}
+
+async function refreshLatestVersionLabel() {
+  try {
+    if (!latestVersionValue) return;
+    const meta = await window.electronAPI.getLatestReleaseInfo();
+    if (meta && meta.success && meta.version) latestVersionValue.textContent = meta.version; else latestVersionValue.textContent = '—';
+  } catch {
+    if (latestVersionValue) latestVersionValue.textContent = '—';
+  }
 }
 
 // Observe navigation to settings updates panel

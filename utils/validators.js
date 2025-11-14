@@ -9,6 +9,7 @@ const ALLOWED_PROVIDERS = new Set([
   'openrouter', 'openai', 'anthropic', 'google', 'groq', 'mistral', 'cohere', 'xai', 'azure-openai', 'custom-openai'
 ]);
 const ALLOWED_STORAGE_LOCATIONS = new Set(['appdata', 'local-app']);
+const ALLOWED_UPDATE_PROVIDERS = new Set(['github', 'generic']);
 
 function isString(v) { return typeof v === 'string'; }
 function isNonEmptyString(v) { return typeof v === 'string' && v.trim().length > 0; }
@@ -71,6 +72,13 @@ function sanitizeSettings(input) {
   if (out.aiModel) out.aiModel = sanitizeModel(out.aiModel);
   if (out.processImages !== undefined) out.processImages = sanitizeBoolean(out.processImages, true);
   if (out.autoApplyUpdates !== undefined) out.autoApplyUpdates = sanitizeBoolean(out.autoApplyUpdates, true);
+  if (out.updateProvider && !ALLOWED_UPDATE_PROVIDERS.has(out.updateProvider)) delete out.updateProvider;
+  if (typeof out.updateGenericUrl === 'string') {
+    const trimmed = out.updateGenericUrl.trim();
+    // Keep only http(s) URLs and cap length
+    if (/^https?:\/\//i.test(trimmed)) out.updateGenericUrl = trimmed.slice(0, 300);
+    else out.updateGenericUrl = '';
+  }
 
   if (out.maxImageCount !== undefined) {
     const n = Number(out.maxImageCount);
@@ -177,6 +185,7 @@ module.exports = {
   sanitizeProvider,
   isValidProvider,
   isValidStorageLocation,
+  ALLOWED_UPDATE_PROVIDERS,
   sanitizeSettings,
   validateProcessDocumentsArgs,
   validateCombinedArgs,

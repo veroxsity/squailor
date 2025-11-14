@@ -388,7 +388,10 @@ const defaultSettings = {
   // Max number of files to combine into a single summary (user configurable)
   maxCombinedFiles: 3,
   // Whether to auto-apply downloaded updates (silent install)
-  autoApplyUpdates: true
+  autoApplyUpdates: true,
+  // Update source: 'github' (package.json publish) or 'generic' (custom base URL)
+  updateProvider: 'github',
+  updateGenericUrl: ''
 };
 
 // Auto-detect storage location based on where data folder exists
@@ -459,6 +462,10 @@ async function loadSettings() {
       // Ensure storageLocation is set correctly
       settings.storageLocation = detected.location;
       settings.dataPath = detected.dataPath;
+  // Ensure new update-related settings exist
+  if (!settings.hasOwnProperty('autoApplyUpdates')) settings.autoApplyUpdates = true;
+  if (!settings.updateProvider) settings.updateProvider = 'github';
+  if (!settings.updateGenericUrl) settings.updateGenericUrl = '';
       
       return settings;
     } catch (error) {
@@ -776,6 +783,18 @@ app.whenReady().then(async () => {
       autoUpdater.logger = log;
       autoUpdater.logger.transports.file.level = 'info';
       autoUpdater.autoDownload = true; // set to false if you prefer manual download
+
+      // Configure update feed if using generic provider
+      try {
+        const s = await loadSettings();
+        if (s.updateProvider === 'generic' && s.updateGenericUrl && /^https?:\/\//i.test(s.updateGenericUrl)) {
+          const base = String(s.updateGenericUrl).replace(/\/+$/, '');
+          autoUpdater.setFeedURL({ provider: 'generic', url: base });
+          try { logStartup('phase:feed-configured:generic:' + base); } catch(_){}
+        } else {
+          try { logStartup('phase:feed-configured:github'); } catch(_){}
+        }
+      } catch (_) { /* ignore feed config errors */ }
 
       // Attach resilient listeners once
       attachAutoUpdaterListeners(autoUpdater, log);
@@ -2236,6 +2255,18 @@ ipcMain.handle('check-for-updates', async () => {
   try {
     const { autoUpdater } = require('electron-updater');
     try { logStartup('phase:check-for-updates:ipc'); } catch(_){}
+    // Reconfigure feed dynamically in case user changed provider in settings
+    try {
+      const s = await loadSettings();
+      if (s.updateProvider === 'generic' && s.updateGenericUrl && /^https?:\/\//i.test(s.updateGenericUrl)) {
+        const base = String(s.updateGenericUrl).replace(/\/+$/, '');
+        autoUpdater.setFeedURL({ provider: 'generic', url: base });
+        try { logStartup('phase:feed-configured:generic:' + base); } catch(_){}
+      } else {
+        // When switching back to GitHub, electron-updater uses package config; no need to setFeedURL
+        try { logStartup('phase:feed-configured:github'); } catch(_){}
+      }
+    } catch (_) {}
     await autoUpdater.checkForUpdates();
     return { success: true };
   } catch (err) {
@@ -2298,10 +2329,15 @@ ipcMain.handle('manual-download-update', async () => {
     const crypto = require('crypto');
     try { logStartup('phase:manual-download:start'); } catch(_){}
     const tmpDir = os.tmpdir();
+    const settings = await loadSettings();
+    const useGeneric = settings.updateProvider === 'generic' && settings.updateGenericUrl && /^https?:\/\//i.test(settings.updateGenericUrl);
+    const baseGeneric = useGeneric ? String(settings.updateGenericUrl).replace(/\/+$/, '') : '';
     const owner = 'veroxsity';
     const repo = 'Squailor';
-    // latest.yml location for GitHub provider
-    const latestUrl = `https://github.com/${owner}/${repo}/releases/latest/download/latest.yml`;
+    // latest.yml location, depending on provider
+    const latestUrl = useGeneric
+      ? `${baseGeneric}/latest.yml`
+      : `https://github.com/${owner}/${repo}/releases/latest/download/latest.yml`;
     const latestYmlPath = path.join(tmpDir, `latest-${Date.now()}.yml`);
     const ymlContent = await new Promise((resolve, reject) => {
       https.get(latestUrl, (res) => {
@@ -2330,7 +2366,9 @@ ipcMain.handle('manual-download-update', async () => {
     const version = versionMatch[1].trim();
     const exeFileName = pathMatch[1].trim();
     const expectedSha512 = sha512Match[1].trim();
-    const downloadUrl = `https://github.com/${owner}/${repo}/releases/download/v${version}/${encodeURIComponent(exeFileName)}`;
+    const downloadUrl = useGeneric
+      ? `${baseGeneric}/${encodeURIComponent(exeFileName)}`
+      : `https://github.com/${owner}/${repo}/releases/download/v${version}/${encodeURIComponent(exeFileName)}`;
     // Prepare temp file path
     const outPath = path.join(tmpDir, exeFileName);
     const hash = crypto.createHash('sha512');
@@ -2514,9 +2552,12 @@ ipcMain.handle('clear-network-diagnostics', async () => {
 ipcMain.handle('get-latest-release-info', async () => {
   try {
     const https = require('https');
+    const s = await loadSettings();
     const owner = 'veroxsity';
     const repo = 'Squailor';
-    const latestUrl = `https://github.com/${owner}/${repo}/releases/latest/download/latest.yml`;
+    const useGeneric = s.updateProvider === 'generic' && s.updateGenericUrl && /^https?:\/\//i.test(s.updateGenericUrl);
+    const baseGeneric = useGeneric ? String(s.updateGenericUrl).replace(/\/+$/, '') : '';
+    const latestUrl = useGeneric ? `${baseGeneric}/latest.yml` : `https://github.com/${owner}/${repo}/releases/latest/download/latest.yml`;
     const data = await new Promise((resolve, reject) => {
       https.get(latestUrl, (res) => {
         if (res.statusCode !== 200) return reject(new Error('Failed latest.yml fetch: ' + res.statusCode));

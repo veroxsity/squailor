@@ -572,6 +572,18 @@
                       <div class="update-info" style="margin-top:12px;display:grid;gap:6px;font-size:13px;">
                         <div><strong>Current version:</strong> <span id="currentVersionValue">Loading...</span></div>
                         <div><strong>Latest available:</strong> <span id="latestVersionValue">—</span></div>
+                        <div class="form-group">
+                          <label class="form-label" for="updateProviderSelect">Update source</label>
+                          <select id="updateProviderSelect" class="modern-select">
+                            <option value="github">GitHub (default)</option>
+                            <option value="generic">Custom URL (CDN)</option>
+                          </select>
+                        </div>
+                        <div class="form-group" id="genericUrlRow" style="display:none;">
+                          <label class="form-label" for="updateGenericUrlInput">Custom update base URL</label>
+                          <input id="updateGenericUrlInput" class="modern-input" type="url" placeholder="https://cdn.example.com/squailor">
+                          <p class="form-helper">Point to a directory containing latest.yml and release files.</p>
+                        </div>
                         <label class="setting-toggle" style="display:flex;align-items:center;gap:6px;margin-top:4px;">
                           <input type="checkbox" id="autoApplyUpdatesToggle">
                           <span>Auto-apply downloaded updates</span>
