@@ -1,5 +1,5 @@
-const { contextBridge, ipcRenderer } = require('electron');
-const validators = require('./utils/validators');
+const { ipcRenderer } = require('electron');
+const validators = require('../utils/validators');
 // Local markdown and sanitization helpers (no CDN)
 let markedParse = null;
 let sanitizeHtml = null;
@@ -22,7 +22,8 @@ try {
   }
 } catch (_) {}
 
-contextBridge.exposeInMainWorld('electronAPI', {
+// With contextIsolation: false, expose directly on window
+window.electronAPI = {
   selectFile: () => ipcRenderer.invoke('select-file'),
   processDocuments: (filePaths, summaryType, apiKey, responseTone, model, summaryStyle, processImages) => 
     ipcRenderer.invoke('process-documents', filePaths, summaryType, apiKey, responseTone, model, summaryStyle, processImages),
@@ -155,4 +156,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
       return null;
     }
   }
-});
+};
+

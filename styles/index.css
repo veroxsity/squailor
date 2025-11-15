@@ -1,0 +1,106 @@
+/* ================================================
+   SQUAILOR - SPOTIFY-INSPIRED DESIGN SYSTEM
+   Main CSS entry point
+   ================================================ */
+
+/* Design System Foundation */
+@import './themes.css';
+@import './base.css';
+@import './layout.css';
+@import './components.css';
+
+/* Page-Specific Styles */
+@import './pages/workspace.css';
+@import './pages/workspace-new.css';
+@import './pages/history.css';
+@import './pages/settings.css';
+@import './pages/summary.css';
+@import './overrides.css';
+
+/* Global Resets & Utilities */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
+  overflow-y: auto;
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--text-primary);
+  background-color: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  overflow-wrap: break-word;
+}
+
+/* Focus visible for accessibility */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--surface-glass-hover);
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--surface);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border);
+}
+
+/* Selection styles */
+::selection {
+  background: var(--accent);
+  color: var(--text-inverse);
+}

@@ -1,0 +1,321 @@
+/* ================================================
+   MODERN WORKSPACE PAGE
+   ================================================ */
+
+.workspace-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: rgba(29, 185, 84, 0.08);
+  border: 1px solid rgba(29, 185, 84, 0.2);
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+}
+
+.alert-icon {
+  font-size: 1.25rem;
+}
+
+.alert-text {
+  flex: 1;
+  color: var(--text-secondary);
+  font-weight: var(--font-weight-medium);
+}
+
+/* Layout Grid */
+.workspace-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0 var(--space-6) var(--space-6);
+}
+
+.workspace-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  width: 100%;
+}
+
+/* Upload Card */
+.upload-card-modern {
+  background: var(--surface-secondary);
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  transition: all var(--transition-base);
+}
+
+.upload-card-modern:hover {
+  border-color: var(--accent-primary);
+  background: var(--surface-tertiary);
+}
+
+.dropzone-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-4);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dropzone-compact.drag-over {
+  background: var(--accent-primary-alpha);
+  border-color: var(--accent-primary);
+}
+
+.dropzone-compact.drag-over .dropzone-icon {
+  transform: scale(1.1);
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.dropzone-icon {
+  width: 64px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass);
+  color: var(--accent-primary);
+  transition: all var(--transition-fast);
+}
+
+.dropzone-compact:hover .dropzone-icon {
+  transform: scale(1.1);
+  background: var(--accent-primary);
+  color: var(--text-inverse);
+}
+
+.dropzone-text h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.dropzone-text p {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+/* File Queue */
+.file-queue-card {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.file-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-4);
+}
+
+.file-queue-header h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-1) 0;
+}
+
+.queue-count {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  margin: 0;
+}
+
+.file-queue-list,
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+/* Custom Prompt */
+.custom-prompt-card {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.form-label-hint {
+  display: block;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-regular);
+  color: var(--text-tertiary);
+  margin-top: var(--space-1);
+}
+
+/* Options Sidebar */
+.options-card {
+  background: var(--surface-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+}
+
+.options-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-5) 0;
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.option-group {
+  margin-bottom: var(--space-5);
+}
+
+.option-group:last-child {
+  margin-bottom: 0;
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.option-icon {
+  font-size: 1.1rem;
+}
+
+/* Full-width radio groups in workspace */
+.options-card .radio-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: var(--space-3);
+}
+
+.options-card .radio-pill {
+  width: 100%;
+}
+
+.options-card .radio-pill label {
+  width: 100%;
+  justify-content: center;
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-base);
+}
+
+.options-card .select {
+  width: 100%;
+}
+
+.toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+}
+
+/* Toggle row wrapper */
+.options-card .toggle-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* Checkbox styled as toggle pill */
+.options-card .toggle-switch input[type="checkbox"] {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 24px;
+  min-width: 44px;
+  max-width: 44px;
+  flex: 0 0 44px;
+  margin: 0;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--surface-tertiary);
+  box-shadow: inset 0 0 0 1px var(--border-subtle);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+/* Slider knob */
+.options-card .toggle-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface-primary);
+  transition: transform var(--transition-fast);
+  pointer-events: none;
+}
+
+/* Checked state */
+.options-card .toggle-switch input[type="checkbox"]:checked {
+  background: var(--accent-primary);
+  box-shadow: none;
+}
+
+.options-card .toggle-switch input[type="checkbox"]:checked::before {
+  transform: translateX(20px);
+  background: var(--text-inverse);
+}
+
+/* Label wrapper */
+.options-card .toggle-switch-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  cursor: pointer;
+}
+
+.options-card .toggle-title {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.options-card .toggle-desc {
+  display: block;
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  line-height: 1.4;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .workspace-header,
+  .workspace-layout {
+    padding: var(--space-4);
+  }
+}

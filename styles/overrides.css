@@ -1,0 +1,4 @@
+/* Theme overrides for dark mode brightness issues in settings nav */
+.settings-nav-item {
+  background: var(--surface-glass);
+}

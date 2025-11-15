@@ -39,6 +39,11 @@ export default [
         URL: 'readonly',
         crypto: 'readonly',
         fetch: 'readonly',
+    // Add missing browser globals used in renderer to silence no-undef
+    localStorage: 'readonly',
+    requestAnimationFrame: 'readonly',
+    Blob: 'readonly',
+    CustomEvent: 'readonly',
   TextDecoder: 'readonly',
   TextEncoder: 'readonly',
       },
