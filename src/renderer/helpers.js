@@ -25,15 +25,17 @@ function showToast(message, type = 'info') {
 function showConfirm(message) {
   return new Promise((resolve) => {
     const modal = document.getElementById('confirmModal');
+    const titleEl = document.getElementById('confirmModalBody');
     const msgEl = document.getElementById('confirmMessage');
-    const okBtn = document.getElementById('confirmOk');
-    const cancelBtn = document.getElementById('confirmCancel');
+    const okBtn = document.getElementById('confirmOkBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
 
-    if (!modal || !msgEl || !okBtn || !cancelBtn) {
+    if (!modal || !titleEl || !msgEl || !okBtn || !cancelBtn) {
       resolve(false);
       return;
     }
 
+    titleEl.textContent = 'Confirm Action';
     msgEl.textContent = message;
     modal.hidden = false;
     modal.classList.add('active');
@@ -101,6 +103,95 @@ function showConfirm(message) {
 
     okBtn.addEventListener('click', onOk);
     cancelBtn.addEventListener('click', onCancel);
+    window.addEventListener('keydown', onKeydown);
+    content && content.addEventListener('keydown', onTrap);
+  });
+}
+
+// Information dialog (no cancel, just OK)
+function showInfoModal(message, title = 'Information') {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('confirmModal');
+    const titleEl = document.getElementById('confirmModalBody');
+    const msgEl = document.getElementById('confirmMessage');
+    const okBtn = document.getElementById('confirmOkBtn');
+    const cancelBtn = document.getElementById('confirmCancelBtn');
+
+    if (!modal || !titleEl || !msgEl || !okBtn || !cancelBtn) {
+      resolve();
+      return;
+    }
+
+    // Update title and message
+    titleEl.textContent = title;
+    msgEl.textContent = message;
+
+    // Hide cancel button and change OK text
+    cancelBtn.style.display = 'none';
+    okBtn.textContent = 'OK';
+
+    modal.hidden = false;
+    modal.classList.add('active');
+
+    const previouslyFocused = document.activeElement;
+    if (okBtn && typeof okBtn.focus === 'function') {
+      okBtn.focus();
+    }
+
+    const content = modal.querySelector('.modal-content');
+    const focusableSelectors =
+      'a[href], area[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), iframe, object, embed, [tabindex]:not([tabindex="-1"])';
+    const getFocusable = () =>
+      Array.from(content.querySelectorAll(focusableSelectors)).filter(
+        (el) => el.offsetParent !== null || el.getAttribute('aria-hidden') !== 'true'
+      );
+
+    function onOk() {
+      cleanup();
+      resolve();
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        cleanup();
+        resolve();
+      }
+    }
+
+    function onTrap(e) {
+      if (e.key !== 'Tab') return;
+      const els = getFocusable();
+      if (!els.length) return;
+      const firstEl = els[0];
+      const lastEl = els[els.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === firstEl) {
+          lastEl.focus();
+          e.preventDefault();
+        }
+      } else {
+        if (document.activeElement === lastEl) {
+          firstEl.focus();
+          e.preventDefault();
+        }
+      }
+    }
+
+    function cleanup() {
+      modal.classList.remove('active');
+      modal.hidden = true;
+      okBtn.removeEventListener('click', onOk);
+      window.removeEventListener('keydown', onKeydown);
+      content && content.removeEventListener('keydown', onTrap);
+      // Restore cancel button and OK text
+      cancelBtn.style.display = '';
+      okBtn.textContent = 'Confirm';
+      if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+        previouslyFocused.focus();
+      }
+    }
+
+    okBtn.addEventListener('click', onOk);
     window.addEventListener('keydown', onKeydown);
     content && content.addEventListener('keydown', onTrap);
   });
@@ -244,6 +335,7 @@ function init() {
   // Expose helpers globally for inline handlers and other modules
   window.showToast = showToast;
   window.showConfirm = showConfirm;
+  window.showInfoModal = showInfoModal;
   window.escapeHtml = escapeHtml;
   window.copyTextToClipboard = copyTextToClipboard;
   window.shareSummaryText = shareSummaryText;
@@ -254,6 +346,7 @@ module.exports = {
   init,
   showToast,
   showConfirm,
+  showInfoModal,
   escapeHtml,
   copyTextToClipboard,
   shareSummaryText,

@@ -101,6 +101,7 @@ function renderFileList() {
       const fileName = filePath.split(/[/\\]/).pop();
       const ext = fileName.split('.').pop().toUpperCase();
       const icon = ext === 'PDF' ? '📕' : '📊';
+      const escapedFilePath = filePath.replace(/'/g, '\\\'');
       return `
         <div class="file-item" data-index="${index}">
           <div class="file-info">
@@ -113,7 +114,7 @@ function renderFileList() {
               </div>
             </div>
           </div>
-          <button class="remove-btn" onclick="window.workspaceModule.removeFile(${index})">Remove</button>
+          <button class="remove-btn" onclick="window.workspaceModule.removeFile('${escapedFilePath}')">Remove</button>
         </div>
       `;
     })
@@ -126,9 +127,36 @@ async function handleSelectFilesClick() {
   if (!window.electronAPI || !window.electronAPI.selectFile) return;
   const filePaths = await window.electronAPI.selectFile();
   if (filePaths && filePaths.length > 0) {
-    selectedFiles = filePaths;
-    renderFileList();
-    if (processFilesBtn) processFilesBtn.disabled = false;
+    // Check for duplicates
+    const newFiles = [];
+    const duplicates = [];
+    
+    filePaths.forEach(filePath => {
+      if (selectedFiles.includes(filePath)) {
+        duplicates.push(filePath.split(/[/\\]/).pop()); // Extract filename
+      } else {
+        newFiles.push(filePath);
+      }
+    });
+    
+    // Add only new files
+    if (newFiles.length > 0) {
+      selectedFiles = [...selectedFiles, ...newFiles];
+      renderFileList();
+      if (processFilesBtn) processFilesBtn.disabled = false;
+    }
+    
+    // Show feedback
+    if (duplicates.length > 0 && window.showToast) {
+      const msg = duplicates.length === 1 
+        ? `File "${duplicates[0]}" is already in the queue`
+        : `${duplicates.length} files already in queue (duplicates ignored)`;
+      window.showToast(msg, 'info');
+    }
+    
+    if (newFiles.length === 0 && duplicates.length > 0 && window.showToast) {
+      window.showToast('No new files added - all selected files are already in the queue', 'warning');
+    }
   }
 }
 
@@ -303,10 +331,24 @@ async function handleProcessFilesClick() {
       );
       console.log('Processing results:', results);
       await displayResults(results);
-    }
 
-    selectedFiles = [];
-    renderFileList();
+      // Handle duplicates: keep them in queue and show feedback
+      const duplicateResults = results.filter(r => r.duplicate);
+      if (duplicateResults.length > 0) {
+        selectedFiles = selectedFiles.filter(f => duplicateResults.some(d => d.filePath === f));
+        renderFileList();
+        const dupNames = duplicateResults.map(r => r.fileName);
+        const message = `The following files were skipped because they have already been summarized:\n\n${dupNames.join('\n')}\n\nThese files remain in your queue. You can remove them or try different summary settings.`;
+        if (window.showInfoModal) {
+          window.showInfoModal(message, 'Duplicate Files Detected');
+        } else if (window.showToast) {
+          window.showToast(`Duplicate files skipped: ${dupNames.join(', ')}`, 'warning');
+        }
+      } else {
+        selectedFiles = [];
+        renderFileList();
+      }
+    }
   } catch (error) {
     console.error('Error processing documents:', error);
     window.showToast && window.showToast(`Error processing documents: ${error.message}`, 'error');
@@ -320,6 +362,12 @@ async function handleProcessFilesClick() {
     if (queueTokensEl && !selectedFiles.length) {
       queueTokensEl.textContent = '—';
     }
+
+    // Re-enable remove buttons
+    document.querySelectorAll('.remove-btn').forEach(btn => {
+      btn.removeAttribute('disabled');
+      btn.style.opacity = '';
+    });
   }
 }
 
@@ -466,9 +514,36 @@ function init() {
       if (files && files.length > 0) {
         const filePaths = files.map(f => f.path).filter(Boolean);
         if (filePaths.length > 0) {
-          selectedFiles = filePaths;
-          renderFileList();
-          if (processFilesBtn) processFilesBtn.disabled = false;
+          // Check for duplicates in drag-and-drop
+          const newFiles = [];
+          const duplicates = [];
+          
+          filePaths.forEach(filePath => {
+            if (selectedFiles.includes(filePath)) {
+              duplicates.push(filePath.split(/[/\\]/).pop());
+            } else {
+              newFiles.push(filePath);
+            }
+          });
+          
+          // Add only new files
+          if (newFiles.length > 0) {
+            selectedFiles = [...selectedFiles, ...newFiles];
+            renderFileList();
+            if (processFilesBtn) processFilesBtn.disabled = false;
+          }
+          
+          // Show feedback
+          if (duplicates.length > 0 && window.showToast) {
+            const msg = duplicates.length === 1 
+              ? `File "${duplicates[0]}" is already in the queue`
+              : `${duplicates.length} files already in queue (duplicates ignored)`;
+            window.showToast(msg, 'info');
+          }
+          
+          if (newFiles.length === 0 && duplicates.length > 0 && window.showToast) {
+            window.showToast('No new files added - all selected files are already in the queue', 'warning');
+          }
         }
       }
     });
@@ -519,9 +594,12 @@ function init() {
   }
 
   window.workspaceModule = {
-    removeFile(index) {
-      selectedFiles.splice(index, 1);
-      renderFileList();
+    removeFile(filePath) {
+      const index = selectedFiles.indexOf(filePath);
+      if (index !== -1) {
+        selectedFiles.splice(index, 1);
+        renderFileList();
+      }
     },
     renderFileList,
     displayResults,
