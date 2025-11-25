@@ -172,6 +172,17 @@
   100% { transform: translateX(-40%); }
 }
 
+/* Small live preview for in-progress summaries */
+.file-summary-preview {
+  font-size: 0.85rem;
+  color: var(--text-tertiary);
+  margin-top: var(--space-2);
+  max-height: 4.5rem; /* two-three lines */
+  overflow: hidden;
+  white-space: pre-wrap;
+  text-overflow: ellipsis;
+}
+
 /* Custom Prompt */
 .custom-prompt-card {
   background: var(--surface-secondary);

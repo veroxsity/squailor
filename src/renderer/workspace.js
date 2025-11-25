@@ -114,6 +114,7 @@ function renderFileList() {
               <div class="file-progress-bar" id="file-progress-${index}" style="display: none;">
                 <div class="progress-fill"></div>
               </div>
+              <div class="file-summary-preview" id="file-preview-${index}" style="display:none;"> </div>
             </div>
           </div>
           <button class="remove-btn" onclick="window.workspaceModule.removeFile('${escapedFilePath}')">Remove</button>
@@ -706,6 +707,29 @@ function handleProcessingProgress(data) {
   if (statusEl && typeof data.status !== 'undefined') {
     statusEl.textContent = data.status || '';
   }
+
+  // Append streaming delta text into preview area when provided
+  try {
+    const previewEl = document.getElementById(`file-preview-${idx}`);
+    if (previewEl) {
+      // If we receive discrete delta stream chunks, append them for live preview
+      if (typeof data.delta === 'string' && data.delta.trim().length > 0) {
+        previewEl.style.display = '';
+        // Simple append; keep preview length bounded to avoid memory bloat
+        const maxLen = 2000;
+        const prev = previewEl.textContent || '';
+        let next = prev + data.delta;
+        if (next.length > maxLen) next = next.slice(-maxLen);
+        previewEl.textContent = next;
+      }
+
+      // If summary generated final text is provided, replace preview with short snippet
+      if (typeof data.stage !== 'undefined' && (data.stage === 'complete' || data.stage === 'generated') && typeof data.summary === 'string') {
+        previewEl.style.display = '';
+        previewEl.textContent = (data.summary || '').substring(0, 800);
+      }
+    }
+  } catch (_) {}
 
   // Basic progress handling heuristics
   if (progressEl) {

@@ -303,6 +303,18 @@ async function processDocuments({
         }
       );
 
+      // Emit the full summary to the renderer so UI can display final content immediately
+      try {
+        event.sender.send('processing-progress', {
+          fileName,
+          fileIndex: i + 1,
+          totalFiles,
+          status: 'Summary generated',
+          stage: 'generated',
+          summary
+        });
+      } catch (_) {}
+
       event.sender.send('processing-progress', {
         fileName,
         fileIndex: i + 1,
@@ -614,6 +626,18 @@ async function processDocumentsCombined({
         apiVersion: providerConfig.apiVersion
       }
     );
+
+    try {
+      // Notify renderer with combined final summary content so preview shows it
+      event.sender.send('processing-progress', {
+        fileName: `Combined: ${extracted[0].fileName}`,
+        fileIndex: 1,
+        totalFiles,
+        status: 'Combined summary generated',
+        stage: 'generated',
+        summary: combinedSummary
+      });
+    } catch (_) {}
   } catch (error) {
     let displayMessage = error.message || 'AI summarization failed';
     event.sender.send('processing-progress', {
