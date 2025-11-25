@@ -86,27 +86,37 @@ function viewFullSummary(index) {
   const styleDisplay = styleMap[item.summaryStyle] || 'Teaching';
 
   const summaryHeading = document.getElementById('summaryViewHeading');
-  if (summaryHeading) summaryHeading.textContent = item.fileName;
+  if (summaryHeading) summaryHeading.textContent = item.fileName || 'Summary';
 
   const summaryMeta = document.getElementById('summaryViewMeta');
   if (summaryMeta) {
-    summaryMeta.textContent = `${new Date(item.timestamp).toLocaleString()} • ${item.summaryType.toUpperCase()} • ${toneDisplay} • ${styleDisplay} • ${item.model}`;
+    // Guard against missing metadata to avoid throwing when fields are undefined
+    const when = item.timestamp ? new Date(item.timestamp).toLocaleString() : 'Unknown date';
+    const stype = (item.summaryType || 'normal').toString().toUpperCase();
+    const model = item.model || 'unknown';
+    summaryMeta.textContent = `${when} • ${stype} • ${toneDisplay} • ${styleDisplay} • ${model}`;
   }
 
-  const reduction = Math.round((1 - item.summaryLength / item.originalLength) * 100);
+  let reduction = null;
+  if (typeof item.summaryLength === 'number' && typeof item.originalLength === 'number' && item.originalLength > 0) {
+    reduction = Math.round((1 - item.summaryLength / item.originalLength) * 100);
+  }
   const summaryStats = document.getElementById('summaryViewStats');
   if (summaryStats) {
-    summaryStats.textContent = `Original: ${item.originalLength.toLocaleString()} chars • Summary: ${item.summaryLength.toLocaleString()} chars • ${reduction}% reduction`;
+    const orig = typeof item.originalLength === 'number' ? item.originalLength.toLocaleString() + ' chars' : 'Unknown';
+    const sum = typeof item.summaryLength === 'number' ? item.summaryLength.toLocaleString() + ' chars' : 'Unknown';
+    const red = reduction === null ? '—' : `${reduction}% reduction`;
+    summaryStats.textContent = `Original: ${orig} • Summary: ${sum} • ${red}`;
   }
 
   const summaryMetaChips = document.getElementById('summaryMetaChips');
   if (summaryMetaChips) {
     const escapeHtml = (str) => typeof str === 'string' ? str.replace(/[&<>\"]/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[s])) : '';
     summaryMetaChips.innerHTML = [
-      item.summaryType.toUpperCase(),
+      (item.summaryType || 'NORMAL').toString().toUpperCase(),
       toneDisplay,
       styleDisplay,
-      item.model
+      item.model || 'unknown'
     ].map(value => `<span class="meta-chip">${escapeHtml(value)}</span>`).join('');
   }
 
@@ -342,7 +352,19 @@ function viewFullSummary(index) {
 }
 
 function init() {
-  window.summaryViewModule = { viewFullSummary };
+  window.summaryViewModule = { viewFullSummary, setTemporaryHistory, clearTemporaryHistory };
 }
 
-module.exports = { init, viewFullSummary };
+module.exports = { init, viewFullSummary, setTemporaryHistory, clearTemporaryHistory };
+
+// Allow other modules to set a transient in-memory history used for immediate result viewing
+function setTemporaryHistory(arr) {
+  try {
+    if (!Array.isArray(arr)) return;
+    summaryHistoryRef = arr;
+  } catch (_) {}
+}
+
+function clearTemporaryHistory() {
+  summaryHistoryRef = undefined;
+}

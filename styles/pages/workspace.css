@@ -145,6 +145,33 @@
   overflow-y: auto;
 }
 
+/* Per-file progress bar inside the queue */
+.file-progress-bar {
+  height: 8px;
+  background: var(--surface-glass);
+  border-radius: 999px;
+  width: 100%;
+  margin-top: var(--space-2);
+  overflow: hidden;
+  display: none; /* shown as needed */
+}
+.file-progress-bar .progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg,var(--accent-primary) 0%, rgba(255,255,255,0.08) 100%);
+  transition: width 220ms ease;
+  border-radius: 999px;
+}
+.file-progress-bar .progress-fill.indeterminate {
+  width: 40%;
+  animation: prog-indeterminate 1100ms linear infinite;
+}
+@keyframes prog-indeterminate {
+  0% { transform: translateX(-40%); }
+  50% { transform: translateX(40%); }
+  100% { transform: translateX(-40%); }
+}
+
 /* Custom Prompt */
 .custom-prompt-card {
   background: var(--surface-secondary);

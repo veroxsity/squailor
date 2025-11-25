@@ -195,8 +195,13 @@
   /* ==========================================
      LAYOUT DIMENSIONS
      ========================================== */
-  --rail-width: 80px;
-  --rail-width-expanded: 240px;
+   /* Expanded default sidebar width to avoid label truncation on typical desktops */
+   /* Raised slightly to better display navigation labels on typical desktop layouts */
+   /* Compact default sidebar width so it doesn't take too much horizontal space */
+   /* Very compact (icons-only) default rail width */
+   --rail-width: 72px;
+   /* Expanded hover width for desktop so labels can be displayed comfortably */
+   --rail-width-expanded: 160px; /* more compact hover expansion */
   --header-height: 64px;
   --content-max-width: 1400px;
   --page-padding: 32px;
@@ -227,6 +232,15 @@
   --breakpoint-lg: 1024px;
   --breakpoint-xl: 1280px;
   --breakpoint-2xl: 1536px;
+}
+
+/* Reduce rail width on smaller screens to save space */
+@media (max-width: 992px) {
+   :root { --rail-width: 96px; }
+}
+
+@media (max-width: 640px) {
+   :root { --rail-width: 72px; }
 }
 
 /* Light Theme - Clean white Spotify look */

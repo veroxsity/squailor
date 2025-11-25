@@ -3,7 +3,7 @@
 // Central bootstrap for the Electron main process.
 // All heavy logic has been moved into src/main/* modules; this file wires them together.
 
-const { app, ipcMain, dialog, BrowserWindow } = require('electron');
+const { app, ipcMain, dialog, BrowserWindow, session } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -237,6 +237,34 @@ async function runBlockingUpdateCheck(timeoutMs = 15000) {
 
 // --- App startup ---
 app.whenReady().then(async () => {
+  // Ensure responses include a frame-ancestors directive where possible
+  // Note: frame-ancestors must be delivered via HTTP headers; meta tags are ignored.
+  try {
+    session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+      try {
+        const url = details.url || '';
+        // Only apply for network responses (http/https)
+        if (!url.startsWith('http')) return callback({ responseHeaders: details.responseHeaders });
+
+        const headers = Object.assign({}, details.responseHeaders || {});
+        // Find existing CSP header (case-insensitive)
+        const cspKey = Object.keys(headers).find(k => k.toLowerCase() === 'content-security-policy');
+        const existing = cspKey ? (Array.isArray(headers[cspKey]) ? headers[cspKey][0] : headers[cspKey]) : '';
+
+        // If frame-ancestors directive missing, append a restrictive rule (deny embedding)
+        if (!/frame-ancestors/i.test(existing)) {
+          const newCsp = (existing ? existing + '; ' : '') + "frame-ancestors 'none'";
+          headers['Content-Security-Policy'] = [newCsp];
+        }
+
+        callback({ responseHeaders: headers });
+      } catch (e) {
+        callback({ responseHeaders: details.responseHeaders });
+      }
+    });
+  } catch (e) {
+    // Ignore - webRequest might not be available in all contexts
+  }
   // Show splash quickly so user gets feedback during potentially long startup
   createSplashWindow();
 

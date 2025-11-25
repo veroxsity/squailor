@@ -88,6 +88,8 @@
   height: 100vh;
   z-index: 10;
   overflow-y: auto;
+  /* Allow smooth expansion on hover */
+  transition: width var(--transition-medium) ease;
 }
 
 .rail-top {
@@ -162,6 +164,8 @@
   transition: all var(--transition-fast);
   position: relative;
   overflow: hidden;
+  /* Keep a consistent item height so showing labels does not shift the layout */
+  min-height: 72px;
 }
 
 .rail-item::after {
@@ -183,7 +187,8 @@
 }
 
 .rail-label {
-  display: block;
+  /* Hidden by default for an icons-first rail — exposed on hover/focus/active */
+  display: none;
   max-width: 100%;
   text-align: center;
   line-height: 1.2;
@@ -302,7 +307,41 @@
   flex-direction: column;
   min-height: 100vh;
   margin-left: var(--rail-width);
+  transition: margin-left var(--transition-medium) ease;
   overflow: hidden;
+}
+
+/* Expand rail on hover (desktop) so full labels are visible without truncation */
+@media (min-width: 992px) {
+  .app-rail:hover {
+    width: var(--rail-width-expanded);
+  }
+
+  .app-rail:hover + .app-main {
+    margin-left: var(--rail-width-expanded);
+  }
+
+  .app-rail:hover .rail-item,
+  .rail-item:focus-within,
+  .rail-item.active {
+    /* show labels inline and keep icons stable */
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .app-rail:hover .rail-label,
+  .rail-item:focus-within .rail-label,
+  .rail-item.active .rail-label {
+    /* Expose labels in a compact single-line form when expanded or focused */
+    display: block;
+    white-space: nowrap;
+    text-align: left;
+    max-width: calc(var(--rail-width-expanded) - 32px);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-left: 8px;
+  }
 }
 
 .app-header {

@@ -180,6 +180,12 @@ async function displayResults(results) {
     resultsSection.hidden = false;
   }
   if (resultsDiv) {
+    // Provide these results as a temporary summary history so the summary view can open them
+    try {
+      if (window.summaryViewModule && typeof window.summaryViewModule.setTemporaryHistory === 'function') {
+        window.summaryViewModule.setTemporaryHistory(results);
+      }
+    } catch (_) {}
     const inlineCards = results
       .map((result, index) => {
         if (!result.success) return '';
@@ -581,6 +587,17 @@ function init() {
     });
   }
 
+  // Subscribe to processing progress events from the main process
+  if (window.electronAPI && typeof window.electronAPI.onProcessingProgress === 'function') {
+    window.electronAPI.onProcessingProgress((data) => {
+      try {
+        handleProcessingProgress(data);
+      } catch (e) {
+        console.warn('Error handling processing progress event', e && e.message);
+      }
+    });
+  }
+
   // Add Clear All button handler
   const clearFileListBtn = document.getElementById('clearFileList');
   if (clearFileListBtn) {
@@ -633,6 +650,76 @@ function init() {
       }
     }
   };
+}
+
+// Called when the main process emits a 'processing-progress' event.
+function handleProcessingProgress(data) {
+  if (!data) return;
+
+  // Update the queue summary chip
+  try {
+    if (queueTokensEl && typeof data.fileIndex !== 'undefined' && typeof data.totalFiles !== 'undefined') {
+      queueTokensEl.textContent = `Processing ${data.fileIndex}/${data.totalFiles}`;
+    }
+  } catch (_) {}
+
+  // Resolve the file index to the DOM element index (renderer uses 0-based)
+  let idx = null;
+  if (data && data.fileName && currentFileIndexMap && currentFileIndexMap.has(data.fileName)) {
+    idx = currentFileIndexMap.get(data.fileName);
+  } else if (typeof data.fileIndex !== 'undefined' && data.fileIndex !== null) {
+    idx = Math.max(0, data.fileIndex - 1);
+  }
+
+  if (idx === null || typeof idx === 'undefined') return;
+
+  const statusEl = document.getElementById(`file-status-${idx}`);
+  const progressEl = document.getElementById(`file-progress-${idx}`);
+  const fillEl = progressEl && progressEl.querySelector('.progress-fill');
+
+  // Update status text
+  if (statusEl && typeof data.status !== 'undefined') {
+    statusEl.textContent = data.status || '';
+  }
+
+  // Basic progress handling heuristics
+  if (progressEl) {
+    // Determine percent if available
+    let percent = null;
+    if (typeof data.summarizedChars === 'number' && typeof data.charCount === 'number' && data.charCount > 0) {
+      percent = Math.min(99, Math.round((data.summarizedChars / data.charCount) * 100));
+    } else if (typeof data.chunkIndex === 'number' && typeof data.totalChunks === 'number' && data.totalChunks > 0) {
+      percent = Math.min(98, Math.round((data.chunkIndex / data.totalChunks) * 100));
+    }
+
+    if (percent !== null) {
+      progressEl.style.display = '';
+      if (fillEl) {
+        fillEl.classList.remove('indeterminate');
+        fillEl.style.width = `${percent}%`;
+      }
+    } else {
+      // Show an indeterminate/animated bar for non-percent stages
+      if (data.stage && ['extracting', 'summarizing', 'storing', 'setup', 'saving', 'init', 'duplicate-check', 'extracted'].includes(data.stage)) {
+        progressEl.style.display = '';
+        if (fillEl) {
+          // Give a visual cue by toggling a class; CSS will provide animation
+          fillEl.style.width = '40%';
+          fillEl.classList.add('indeterminate');
+        }
+      } else if (['complete', 'error'].includes(data.stage)) {
+        // Mark complete or error visually
+        if (fillEl) {
+          fillEl.classList.remove('indeterminate');
+          fillEl.style.width = data.stage === 'complete' ? '100%' : '100%';
+        }
+        // hide after a moment so users can see the final state
+        setTimeout(() => {
+          if (progressEl) progressEl.style.display = 'none';
+        }, 700);
+      }
+    }
+  }
 }
 
 module.exports = {
