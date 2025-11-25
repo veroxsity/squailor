@@ -136,7 +136,7 @@ ${text}`;
     } else if (summaryStyle === 'mcqs') {
       // MCQs in brief format: short summary then MCQs
       systemPrompt = `You are an expert at creating concise study prompts and multiple-choice questions in a ${selectedTone.style} tone. ${selectedTone.instructions} ${selectedStyle.instructions}`;
-      userPrompt = `Please create a SHORT study summary followed by ${mcqCount} high-quality multiple-choice questions based on the content below. Each question should have 3-4 options labeled A), B), C), (D) if needed, and clearly mark the correct answer and a short explanation (1-2 sentences). Use a ${selectedTone.style} tone.` + `\n\nContent:\n${text}`;
+      userPrompt = `Please create a SHORT study summary followed by EXACTLY ${mcqCount} high-quality multiple-choice questions based on the content below (no more, no fewer). Each question should have 3-4 options labeled A), B), C), (D) if needed, and clearly mark the correct answer and a short explanation (1-2 sentences). Use a ${selectedTone.style} tone.` + `\n\nContent:\n${text}`;
     } else {
       // Teaching mode
       systemPrompt = `You are an expert at creating concise, bullet-point summaries with a ${selectedTone.style} tone. 
@@ -195,7 +195,7 @@ Content:
 ${text}`;
     } else if (summaryStyle === 'mcqs') {
       systemPrompt = `You are an expert at educational content and question generation, producing a detailed study summary then ${mcqCount} insightful multiple-choice questions with plausible distractors and answer explanations. ${selectedTone.instructions}`;
-      userPrompt = `Please create an EXTENDED study summary and then generate ${mcqCount} multiple-choice questions with 3-4 plausible options each based on the content below. Mark the correct option and include a short explanation for each answer. Maintain ${selectedTone.style} tone.` + `\n\nContent:\n${text}`;
+      userPrompt = `Please create an EXTENDED study summary and then generate EXACTLY ${mcqCount} multiple-choice questions with 3-4 plausible options each based on the content below (no more, no fewer). Mark the correct option and include a short explanation for each answer. Maintain ${selectedTone.style} tone.` + `\n\nContent:\n${text}`;
     } else {
       // Teaching mode - VERY detailed paragraphs
       systemPrompt = `You are an expert educational writer with a ${selectedTone.style} approach. 
@@ -265,7 +265,7 @@ Content:
 ${text}`;
       } else if (summaryStyle === 'mcqs') {
         systemPrompt = `You are an expert at summarizing and creating MCQs in a ${selectedTone.style} manner. After a concise summary, create ${mcqCount} multiple-choice questions with 3-4 options each, label the correct option and add a one-line explanation.`;
-        userPrompt = `Please produce a DETAILED summary followed by ${mcqCount} multiple-choice questions based on the text below. Each question should have clearly labeled choices A), B), C) (and D) if needed), indicate the correct answer, and provide a 1-2 sentence explanation.` + `\n\nContent:\n${text}`;
+        userPrompt = `Please produce a DETAILED summary followed by EXACTLY ${mcqCount} multiple-choice questions based on the text below (no more, no fewer). Each question should have clearly labeled choices A), B), C) (and D) if needed), indicate the correct answer, and provide a 1-2 sentence explanation.` + `\n\nContent:\n${text}`;
       } else {
       // Teaching mode
       systemPrompt = `You are an expert educational assistant with a ${selectedTone.style} approach. 
@@ -356,7 +356,12 @@ ${text}`;
 
       for (let i = 0; i < chunks.length; i++) {
         if (typeof onProgress === 'function') onProgress({ type: 'chunk-start', chunkIndex: i + 1, totalChunks: chunks.length });
-        const chunkPrompt = `${userPrompt.split('Content:')[0]}
+        // For chunk-level prompts avoid asking for MCQs in each chunk (we'll generate MCQs once for the combined output)
+        const chunkHeader = (summaryStyle === 'mcqs')
+          ? 'Please create a concise summary of this part only. DO NOT generate any multiple-choice questions for individual parts — the MCQs should be generated only once after all parts are combined.'
+          : userPrompt.split('Content:')[0];
+
+        const chunkPrompt = `${chunkHeader}
 This is part ${i + 1} of ${chunks.length}.
 
 Content:
@@ -396,7 +401,10 @@ ${chunks[i]}`;
 
       // Combine summaries if multiple chunks
       if (chunkSummaries.length > 1) {
-        const combinedPrompt = `Please merge these per-part outputs into a single, coherent document.
+        // If MCQs mode is selected, ask for a single final summary + exactly mcqCount MCQs
+        const combinedPrompt = (summaryStyle === 'mcqs') ?
+          `Please merge these per-part outputs into a single, coherent study summary. After the combined summary, generate EXACTLY ${mcqCount} multiple-choice questions (no more, no fewer) based only on the merged content. For each question, provide 3-4 plausible options labeled A), B), C), (D) as needed; clearly mark the correct option and write a 1-2 sentence explanation for why the correct answer is correct. Do not include any additional commentary or extras beyond the summary followed by the ${mcqCount} MCQs.` :
+          `Please merge these per-part outputs into a single, coherent document.
 ${summaryType === 'longer' 
   ? 'CRITICAL: Do NOT shorten or aggressively condense. Preserve details and explanations. Stitch the parts together with consistent structure and headings. Deduplicate only trivial exact repeats.'
   : 'Remove obvious redundancy while keeping all key information and flow.'}

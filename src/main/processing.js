@@ -255,7 +255,7 @@ async function processDocuments({
         });
       }
 
-      const summary = await summarizeText(
+      let summary = await summarizeText(
         text,
         summaryType,
         {
@@ -329,6 +329,17 @@ async function processDocuments({
         if (slideMatch && slideMatch[1]) {
           previewText = slideMatch[1].substring(0, 500);
         }
+      }
+
+      // If MCQs mode requested, and adapter returned more MCQs than asked, attempt to trim excess
+      const { trimMcqsFromText } = require('../utils/mcq');
+
+      // If the style is mcqs, trim export to requested count
+      if (summaryStyle === 'mcqs' && Number.isFinite(Number(mcqCount))) {
+        try {
+          const trimmed = trimMcqsFromText(summary, Number(mcqCount));
+          if (typeof trimmed === 'string' && trimmed.length > 0) summary = trimmed;
+        } catch (_) {}
       }
 
       const summaryData = {
@@ -574,7 +585,7 @@ async function processDocumentsCombined({
       });
     }
 
-    combinedSummary = await summarizeText(
+    let combinedSummary = await summarizeText(
       combinedText,
       summaryType,
       {
@@ -628,6 +639,13 @@ async function processDocumentsCombined({
     );
 
     try {
+      // After generation, if combined MCQs requested, trim to requested count
+      if (summaryStyle === 'mcqs' && Number.isFinite(Number(mcqCount))) {
+        try {
+          const trimmed = trimMcqsFromText(combinedSummary, Number(mcqCount));
+          if (typeof trimmed === 'string' && trimmed.length > 0) combinedSummary = trimmed;
+        } catch (_) {}
+      }
       // Notify renderer with combined final summary content so preview shows it
       event.sender.send('processing-progress', {
         fileName: `Combined: ${extracted[0].fileName}`,
