@@ -4,11 +4,13 @@
 
 let maxImagesInput;
 let maxCombinedInput;
+let mcqCountSetting;
 let saveMaxImagesBtn;
 
 function cacheElements() {
   maxImagesInput = document.getElementById('maxImagesInput');
   maxCombinedInput = document.getElementById('maxCombinedInput');
+  // mcqCountSetting is cached in cacheElements
   saveMaxImagesBtn = document.getElementById('saveMaxImages');
 }
 
@@ -27,6 +29,12 @@ async function loadImageSettings() {
     } else if (maxCombinedInput) {
       maxCombinedInput.value = 3; // default
     }
+
+      if (mcqCountSetting && typeof settings.mcqCount === 'number') {
+        mcqCountSetting.value = settings.mcqCount;
+      } else if (mcqCountSetting) {
+        mcqCountSetting.value = 5;
+      }
     
   } catch (error) {
     console.error('Error loading image settings:', error);
@@ -55,6 +63,13 @@ async function handleSaveImageSettings() {
         settings.maxCombinedFiles = value;
       }
     }
+
+    if (mcqCountSetting) {
+      const value = parseInt(mcqCountSetting.value, 10);
+      if (!isNaN(value) && value >= 1 && value <= 50) {
+        settings.mcqCount = value;
+      }
+    }
     
     await window.electronAPI.saveSettings(settings);
     
@@ -79,6 +94,8 @@ function bindEvents() {
   if (saveMaxImagesBtn) {
     saveMaxImagesBtn.addEventListener('click', handleSaveImageSettings);
   }
+
+  mcqCountSetting = document.getElementById('mcqCountSetting');
 }
 
 function init() {

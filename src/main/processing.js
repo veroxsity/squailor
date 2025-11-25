@@ -77,6 +77,7 @@ async function processDocuments({
   model,
   summaryStyle,
   processImagesFlag,
+  mcqCount,
   loadSettings,
 }) {
   const v = validators.validateProcessDocumentsArgs({ filePaths, summaryType, responseTone, model, summaryStyle, processImagesFlag });
@@ -264,6 +265,7 @@ async function processDocuments({
           responseTone,
           summaryStyle,
           images: imagesToUse,
+          mcqCount,
           onProgress: (progress) => {
             if (!progress) return;
             if (progress.type === 'delta') {
@@ -394,6 +396,7 @@ async function processDocumentsCombined({
   model,
   summaryStyle,
   processImagesFlag,
+  mcqCount,
   loadSettings,
 }) {
   const v = validators.validateCombinedArgs({ filePaths, summaryType, responseTone, model, summaryStyle, processImagesFlag });
@@ -569,6 +572,7 @@ async function processDocumentsCombined({
         responseTone,
         summaryStyle,
         images: imagesToUse,
+        mcqCount,
         onProgress: (progress) => {
           if (!progress) return;
           if (progress.type === 'delta') {

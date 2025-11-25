@@ -367,7 +367,7 @@ ipcMain.handle('select-file', async () => {
 });
 
 // Process documents
-ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined) => {
+ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined, mcqCount = undefined) => {
   return processDocuments({
     event,
     filePaths,
@@ -377,12 +377,13 @@ ipcMain.handle('process-documents', async (event, filePaths, summaryType, apiKey
     model,
     summaryStyle,
     processImagesFlag,
+    mcqCount,
     loadSettings,
   });
 });
 
 // Combined summaries
-ipcMain.handle('process-documents-combined', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined) => {
+ipcMain.handle('process-documents-combined', async (event, filePaths, summaryType, apiKey, responseTone = 'casual', model = 'openai/gpt-4o-mini', summaryStyle = 'teaching', processImagesFlag = undefined, mcqCount = undefined) => {
   return processDocumentsCombined({
     event,
     filePaths,
@@ -392,6 +393,7 @@ ipcMain.handle('process-documents-combined', async (event, filePaths, summaryTyp
     model,
     summaryStyle,
     processImagesFlag,
+    mcqCount,
     loadSettings,
   });
 });

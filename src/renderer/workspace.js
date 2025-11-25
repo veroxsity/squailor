@@ -14,6 +14,7 @@ let resultsDiv;
 let resultsSection;
 let queueTokensEl;
 let maxCombinedInput;
+let mcqCountInput;
 let processImagesToggle;
 let combineFilesToggle;
 let modelSelect;
@@ -27,6 +28,7 @@ function cacheDom() {
   resultsSection = document.getElementById('resultsSection');
   queueTokensEl = document.getElementById('queueCount');
   maxCombinedInput = document.getElementById('maxCombinedInput');
+  mcqCountInput = document.getElementById('mcqCountInput');
   processImagesToggle = document.getElementById('processImagesToggle');
   combineFilesToggle = document.getElementById('combineFilesToggle');
   modelSelect = document.getElementById('modelSelect');
@@ -175,6 +177,15 @@ function getSummaryStyle() {
   return selected ? selected.value : 'teaching';
 }
 
+function getMcqCount() {
+  if (!mcqCountInput) return undefined;
+  const v = parseInt(mcqCountInput.value, 10);
+  if (!Number.isFinite(v)) return undefined;
+  if (v < 1) return 1;
+  if (v > 50) return 50;
+  return v;
+}
+
 async function displayResults(results) {
   if (resultsSection) {
     resultsSection.hidden = false;
@@ -303,7 +314,8 @@ async function handleProcessFilesClick() {
         responseTone,
         window.selectedModel,
         summaryStyle,
-        processImages
+        processImages,
+        getMcqCount()
       );
 
       console.log('Combined processing result:', combined);
@@ -333,7 +345,8 @@ async function handleProcessFilesClick() {
         responseTone,
         window.selectedModel,
         summaryStyle,
-        processImages
+        processImages,
+        getMcqCount()
       );
       console.log('Processing results:', results);
       await displayResults(results);
@@ -567,6 +580,18 @@ function init() {
       renderFileList();
     });
   }
+
+  // Show/hide MCQ count when summary style changes
+  document.addEventListener('change', (e) => {
+    try {
+      if (!e || !e.target) return;
+      if (e.target.name === 'summaryStyle') {
+        const mcqRow = document.getElementById('mcqCountRow');
+        if (!mcqRow) return;
+        mcqRow.style.display = (e.target.value === 'mcqs') ? '' : 'none';
+      }
+    } catch (_) {}
+  });
 
   // Save model selection when changed
   if (modelSelect) {

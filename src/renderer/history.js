@@ -93,7 +93,8 @@ function renderHistory() {
 
     const styleMap = {
       teaching: '👨‍🏫 Teaching',
-      notes: '📝 Notes'
+      notes: '📝 Notes',
+      mcqs: '❓ MCQs'
     };
     const styleDisplay = styleMap[item.summaryStyle] || '👨‍🏫 Teaching';
 
@@ -259,9 +260,10 @@ function exportHistoryItem(index) {
   };
   const toneDisplay = toneMap[item.responseTone] || 'Casual';
 
-  const styleMap = {
-    teaching: 'Teaching',
-    notes: 'Notes'
+    const styleMap = {
+      teaching: 'Teaching',
+      notes: 'Notes',
+      mcqs: 'MCQs'
   };
   const styleDisplay = styleMap[item.summaryStyle] || 'Teaching';
 

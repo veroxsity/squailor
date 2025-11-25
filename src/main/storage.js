@@ -54,6 +54,7 @@ const defaultSettings = {
   version: '1.0.0',
   maxImageCount: 3,
   processImages: true,
+  mcqCount: 5,
   maxCombinedFiles: 3,
   autoApplyUpdates: true,
   updateProvider: 'github',

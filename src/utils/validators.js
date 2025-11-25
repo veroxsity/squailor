@@ -4,7 +4,7 @@ const path = require('path');
 const ALLOWED_EXTENSIONS = new Set(['.pdf', '.pptx', '.ppt', '.docx', '.doc']);
 const ALLOWED_SUMMARY_TYPES = new Set(['short', 'normal', 'longer']);
 const ALLOWED_TONES = new Set(['casual', 'formal', 'informative', 'eli5']);
-const ALLOWED_STYLES = new Set(['teaching', 'notes']);
+const ALLOWED_STYLES = new Set(['teaching', 'notes', 'mcqs']);
 const ALLOWED_PROVIDERS = new Set([
   'openrouter', 'openai', 'anthropic', 'google', 'groq', 'mistral', 'cohere', 'xai', 'azure-openai', 'custom-openai'
 ]);
@@ -89,6 +89,12 @@ function sanitizeSettings(input) {
     const n = Number(out.maxCombinedFiles);
     if (Number.isFinite(n)) out.maxCombinedFiles = Math.max(1, Math.min(10, Math.trunc(n)));
     else delete out.maxCombinedFiles;
+  }
+
+  if (out.mcqCount !== undefined) {
+    const n = Number(out.mcqCount);
+    if (Number.isFinite(n)) out.mcqCount = Math.max(1, Math.min(50, Math.trunc(n)));
+    else delete out.mcqCount;
   }
 
   // Sanitize aiConfig per provider for known keys only

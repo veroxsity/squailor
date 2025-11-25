@@ -82,6 +82,7 @@ function viewFullSummary(index) {
   const styleMap = {
     teaching: 'Teaching',
     notes: 'Notes'
+    ,mcqs: 'MCQs'
   };
   const styleDisplay = styleMap[item.summaryStyle] || 'Teaching';
 

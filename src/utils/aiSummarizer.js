@@ -8,7 +8,7 @@ const { supportsVision: adapterSupportsVision } = require('./ai/providers/capabi
  * @param {string} apiKey - OpenRouter API key
  * @param {string} responseTone - Tone of response ('casual', 'formal', 'informative', 'eli5')
  * @param {string} model - Model to use (defaults to gpt-4o-mini via OpenRouter)
- * @param {string} summaryStyle - Style of summary ('teaching' or 'notes')
+ * @param {string} summaryStyle - Style of summary ('teaching', 'notes' or 'mcqs')
  * @param {function|null} onProgress - optional callback for streaming progress
  * @param {Array<{dataUrl:string, altText?:string}>} [images] - Optional images for vision-capable models
  * @returns {Promise<string>} - Summary text
@@ -76,9 +76,17 @@ async function summarizeText(text, summaryType, arg3, responseTone = 'casual', m
         ? 'Write as if a dedicated student is taking comprehensive notes during an important lecture. Use bullet points but EXPAND each point with full explanations and details. Write complete thoughts and elaborate explanations, not just short phrases. Use arrows (→), dashes (-), and indentation for hierarchy, but include thorough details at each level.'
         : 'Write as if a student is taking notes during class. Use bullet points, short phrases, abbreviations where natural, key terms highlighted, and organized sections. Be concise but capture all important information. Use arrows (→), dashes (-), and indentation for hierarchy.'
     }
+    ,
+    mcqs: {
+      format: 'multiple-choice questions',
+      instructions: 'Generate a short, focused study summary followed by a set of multiple-choice questions (MCQs) based on the content. Each question should have 3–4 plausible answer options and an explicit correct answer with a brief explanation. When a mcqCount is provided in options, generate that many MCQs; default to 5 if not specified.'
+    }
   };
 
   const selectedStyle = styleInstructions[summaryStyle] || styleInstructions.teaching;
+
+  // If MCQs style is requested, honor mcqCount provided in opts (or default)
+  const mcqCount = Number.isFinite(Number(opts.mcqCount)) ? Math.max(1, Math.min(50, Math.trunc(Number(opts.mcqCount)))) : 5;
 
   // Estimate length targets to reduce over-compression, especially in 'longer' mode
   const approxWords = Math.max(1, Math.floor(text.length / 5));
@@ -125,6 +133,10 @@ Example format:
 
 Content:
 ${text}`;
+    } else if (summaryStyle === 'mcqs') {
+      // MCQs in brief format: short summary then MCQs
+      systemPrompt = `You are an expert at creating concise study prompts and multiple-choice questions in a ${selectedTone.style} tone. ${selectedTone.instructions} ${selectedStyle.instructions}`;
+      userPrompt = `Please create a SHORT study summary followed by ${mcqCount} high-quality multiple-choice questions based on the content below. Each question should have 3-4 options labeled A), B), C), (D) if needed, and clearly mark the correct answer and a short explanation (1-2 sentences). Use a ${selectedTone.style} tone.` + `\n\nContent:\n${text}`;
     } else {
       // Teaching mode
       systemPrompt = `You are an expert at creating concise, bullet-point summaries with a ${selectedTone.style} tone. 
@@ -181,6 +193,9 @@ Use a ${selectedTone.style} writing style in ${selectedStyle.format} format.
 
 Content:
 ${text}`;
+    } else if (summaryStyle === 'mcqs') {
+      systemPrompt = `You are an expert at educational content and question generation, producing a detailed study summary then ${mcqCount} insightful multiple-choice questions with plausible distractors and answer explanations. ${selectedTone.instructions}`;
+      userPrompt = `Please create an EXTENDED study summary and then generate ${mcqCount} multiple-choice questions with 3-4 plausible options each based on the content below. Mark the correct option and include a short explanation for each answer. Maintain ${selectedTone.style} tone.` + `\n\nContent:\n${text}`;
     } else {
       // Teaching mode - VERY detailed paragraphs
       systemPrompt = `You are an expert educational writer with a ${selectedTone.style} approach. 
@@ -248,7 +263,10 @@ Example format:
 
 Content:
 ${text}`;
-    } else {
+      } else if (summaryStyle === 'mcqs') {
+        systemPrompt = `You are an expert at summarizing and creating MCQs in a ${selectedTone.style} manner. After a concise summary, create ${mcqCount} multiple-choice questions with 3-4 options each, label the correct option and add a one-line explanation.`;
+        userPrompt = `Please produce a DETAILED summary followed by ${mcqCount} multiple-choice questions based on the text below. Each question should have clearly labeled choices A), B), C) (and D) if needed), indicate the correct answer, and provide a 1-2 sentence explanation.` + `\n\nContent:\n${text}`;
+      } else {
       // Teaching mode
       systemPrompt = `You are an expert educational assistant with a ${selectedTone.style} approach. 
 Your task is to create comprehensive summaries that help students learn and understand content better.
