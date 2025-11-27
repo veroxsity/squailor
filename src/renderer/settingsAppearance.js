@@ -1,46 +1,55 @@
 'use strict';
 
-// Appearance settings: handles theme selection
+// Appearance settings: handles theme and accent color selection
 
-function loadAppearanceSettings() {
-  const themeOptions = document.querySelectorAll('.theme-option');
-  
-  if (!themeOptions.length) return;
-  
-  // Get current theme from data attribute or localStorage
-  const currentTheme = document.documentElement.getAttribute('data-theme') || 
-                      localStorage.getItem('theme') || 
-                      'dark';
-  
-  // Set active state on current theme
-  themeOptions.forEach(option => {
-    const theme = option.getAttribute('data-theme');
-    if (theme === currentTheme) {
-      option.classList.add('active');
-    } else {
-      option.classList.remove('active');
-    }
-  });
-}
+// Accent color definitions
+const accentColors = {
+  blurple: { primary: '#5865F2', hover: '#4752c4', pressed: '#3c45a5' },
+  green: { primary: '#57F287', hover: '#3ba55c', pressed: '#2d8049' },
+  blue: { primary: '#3B82F6', hover: '#2563eb', pressed: '#1d4ed8' },
+  purple: { primary: '#8B5CF6', hover: '#7c3aed', pressed: '#6d28d9' },
+  pink: { primary: '#EC4899', hover: '#db2777', pressed: '#be185d' },
+  orange: { primary: '#F97316', hover: '#ea580c', pressed: '#c2410c' },
+  red: { primary: '#EF4444', hover: '#dc2626', pressed: '#b91c1c' }
+};
 
-function setTheme(theme) {
-  // Update HTML attribute
+function applyTheme(theme) {
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const resolved = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
+
+  // Remove all theme classes
+  document.body.classList.remove('dark-theme', 'light-theme', 'high-contrast-theme');
+  document.documentElement.classList.remove('dark-theme', 'light-theme', 'high-contrast-theme');
+  
+  // Apply the resolved theme
+  const themeClass = `${resolved}-theme`;
+  document.body.classList.add(themeClass);
+  document.documentElement.classList.add(themeClass);
+  
+  // Also set data attribute for CSS selectors
   document.documentElement.setAttribute('data-theme', theme);
-  
+
   // Save to localStorage
-  localStorage.setItem('theme', theme);
-  
-  // Update active state
-  const themeOptions = document.querySelectorAll('.theme-option');
-  themeOptions.forEach(option => {
-    const optionTheme = option.getAttribute('data-theme');
-    if (optionTheme === theme) {
+  localStorage.setItem('app_theme', theme);
+
+  // Update theme card active states
+  document.querySelectorAll('.theme-card').forEach(card => {
+    if (card.dataset.theme === theme) {
+      card.classList.add('active');
+    } else {
+      card.classList.remove('active');
+    }
+  });
+
+  // Also support old theme-option class for backward compatibility
+  document.querySelectorAll('.theme-option').forEach(option => {
+    if (option.dataset.theme === theme) {
       option.classList.add('active');
     } else {
       option.classList.remove('active');
     }
   });
-  
+
   // Show toast notification
   if (window.showToast) {
     const themeNames = {
@@ -53,39 +62,144 @@ function setTheme(theme) {
   }
 }
 
-function bindEvents() {
-  const themeOptions = document.querySelectorAll('.theme-option');
+function applyAccent(accent) {
+  const colors = accentColors[accent] || accentColors.blurple;
   
-  themeOptions.forEach(option => {
-    option.addEventListener('click', () => {
-      const theme = option.getAttribute('data-theme');
+  document.documentElement.style.setProperty('--accent-primary', colors.primary);
+  document.documentElement.style.setProperty('--accent-hover', colors.hover);
+  document.documentElement.style.setProperty('--accent-pressed', colors.pressed);
+  document.documentElement.style.setProperty('--accent', colors.primary);
+  document.documentElement.style.setProperty('--accent-strong', colors.hover);
+  
+  localStorage.setItem('app_accent', accent);
+
+  // Update accent swatch active states
+  document.querySelectorAll('.accent-swatch').forEach(swatch => {
+    if (swatch.dataset.accent === accent) {
+      swatch.classList.add('active');
+    } else {
+      swatch.classList.remove('active');
+    }
+  });
+
+  // Show toast
+  if (window.showToast) {
+    const accentNames = {
+      blurple: 'Blurple',
+      green: 'Green',
+      blue: 'Blue',
+      purple: 'Purple',
+      pink: 'Pink',
+      orange: 'Orange',
+      red: 'Red'
+    };
+    window.showToast(`Accent color changed to ${accentNames[accent] || accent}`, 'success');
+  }
+}
+
+function loadAppearanceSettings() {
+  const currentTheme = localStorage.getItem('app_theme') || 'dark';
+  const currentAccent = localStorage.getItem('app_accent') || 'blurple';
+  
+  // Update theme card states
+  document.querySelectorAll('.theme-card').forEach(card => {
+    if (card.dataset.theme === currentTheme) {
+      card.classList.add('active');
+    } else {
+      card.classList.remove('active');
+    }
+  });
+
+  // Update accent swatch states
+  document.querySelectorAll('.accent-swatch').forEach(swatch => {
+    if (swatch.dataset.accent === currentAccent) {
+      swatch.classList.add('active');
+    } else {
+      swatch.classList.remove('active');
+    }
+  });
+}
+
+function bindEvents() {
+  // Theme card click handlers
+  document.querySelectorAll('.theme-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const theme = card.dataset.theme;
       if (theme) {
-        setTheme(theme);
+        applyTheme(theme);
+      }
+    });
+  });
+
+  // Old theme-option click handlers (backward compatibility)
+  document.querySelectorAll('.theme-option').forEach(option => {
+    option.addEventListener('click', () => {
+      const theme = option.dataset.theme;
+      if (theme) {
+        applyTheme(theme);
+      }
+    });
+  });
+
+  // Accent color click handlers
+  document.querySelectorAll('.accent-swatch').forEach(swatch => {
+    swatch.addEventListener('click', () => {
+      const accent = swatch.dataset.accent;
+      if (accent) {
+        applyAccent(accent);
       }
     });
   });
   
-  // Also bind the header theme button if it exists
+  // Header theme button
   const openSettingsAppearanceBtn = document.getElementById('openSettingsAppearance');
   if (openSettingsAppearanceBtn) {
     openSettingsAppearanceBtn.addEventListener('click', () => {
-      // Navigate to settings appearance panel
-      if (window.settingsModule && window.settingsModule.activate) {
-        // First navigate to settings page
-        const settingsPageBtn = document.querySelector('[data-page="settings"]');
-        if (settingsPageBtn) {
-          settingsPageBtn.click();
-        }
-        // Then activate appearance panel
-        setTimeout(() => {
+      const settingsPageBtn = document.querySelector('[data-page="settings"]');
+      if (settingsPageBtn) {
+        settingsPageBtn.click();
+      }
+      setTimeout(() => {
+        if (window.settingsModule && window.settingsModule.activate) {
           window.settingsModule.activate('appearance');
-        }, 100);
+        }
+      }, 100);
+    });
+  }
+
+  // Listen for system theme changes
+  if (window.matchMedia) {
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+      const currentTheme = localStorage.getItem('app_theme');
+      if (currentTheme === 'system') {
+        applyTheme('system');
       }
     });
   }
 }
 
 function init() {
+  // Apply saved theme and accent on startup
+  const savedTheme = localStorage.getItem('app_theme') || 'dark';
+  const savedAccent = localStorage.getItem('app_accent') || 'blurple';
+  
+  // Apply theme (without toast on init)
+  const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const resolved = savedTheme === 'system' ? (prefersDark ? 'dark' : 'light') : savedTheme;
+  const themeClass = `${resolved}-theme`;
+  document.body.classList.add(themeClass);
+  document.documentElement.classList.add(themeClass);
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  
+  // Apply accent colors
+  const colors = accentColors[savedAccent] || accentColors.blurple;
+  document.documentElement.style.setProperty('--accent-primary', colors.primary);
+  document.documentElement.style.setProperty('--accent-hover', colors.hover);
+  document.documentElement.style.setProperty('--accent-pressed', colors.pressed);
+  document.documentElement.style.setProperty('--accent', colors.primary);
+  document.documentElement.style.setProperty('--accent-strong', colors.hover);
+
+  // Bind click events
   bindEvents();
   
   // Listen for panel activation
@@ -100,16 +214,11 @@ function init() {
   if (appearancePanel && !appearancePanel.hidden) {
     loadAppearanceSettings();
   }
-  
-  // Load initial theme on app startup
-  const savedTheme = localStorage.getItem('theme');
-  if (savedTheme) {
-    document.documentElement.setAttribute('data-theme', savedTheme);
-  }
 }
 
 module.exports = {
   init,
-  setTheme,
+  applyTheme,
+  applyAccent,
   loadAppearanceSettings
 };

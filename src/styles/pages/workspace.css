@@ -1,0 +1,535 @@
+/* ================================================
+   WORKSPACE PAGE - Discord-Inspired Design
+   ================================================ */
+
+/* Workspace Header - Simplified */
+.workspace-header {
+  margin-bottom: var(--space-6);
+}
+
+.workspace-header-content {
+  margin-bottom: var(--space-4);
+}
+
+.workspace-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: var(--accent-subtle);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--accent-primary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--space-3);
+}
+
+.workspace-title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--text-primary);
+  line-height: var(--line-height-tight);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--accent-primary) 0%, #7289DA 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Workspace Alert */
+.workspace-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-secondary);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--warning);
+}
+
+.alert-icon {
+  font-size: var(--font-size-md);
+}
+
+.alert-text {
+  flex: 1;
+  font-size: var(--font-size-sm);
+  color: var(--text-secondary);
+}
+
+/* Workspace Layout */
+.workspace-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.workspace-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ================================================
+   OPTIONS CARD - Clean Discord-style
+   ================================================ */
+
+.options-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-5);
+}
+
+.options-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--space-5);
+}
+
+/* Option Groups */
+.option-group {
+  margin-bottom: var(--space-5);
+}
+
+.option-group:last-child {
+  margin-bottom: 0;
+}
+
+.option-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: var(--letter-spacing-wide);
+  margin-bottom: var(--space-3);
+}
+
+.option-icon {
+  font-size: var(--font-size-sm);
+}
+
+/* Select Dropdown */
+.options-card .select {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-tertiary);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.options-card .select:hover {
+  background: var(--bg-modifier-hover);
+}
+
+.options-card .select:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+/* ================================================
+   RADIO PILLS - Discord Button Group Style
+   ================================================ */
+
+.radio-group {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.radio-pill {
+  flex: 1;
+  min-width: 0;
+}
+
+.radio-pill input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.radio-pill label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.radio-pill label:hover {
+  background: var(--bg-modifier-hover);
+  color: var(--text-primary);
+}
+
+.radio-pill input[type="radio"]:checked + label {
+  background: var(--accent-primary);
+  color: white;
+}
+
+.radio-pill input[type="radio"]:focus-visible + label {
+  box-shadow: 0 0 0 2px var(--accent-primary);
+}
+
+/* ================================================
+   TOGGLE SWITCHES - Discord Style
+   ================================================ */
+
+.toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.options-card .toggle-switch {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.options-card .toggle-switch:hover {
+  background: var(--bg-modifier-hover);
+}
+
+/* Toggle Checkbox */
+.options-card .toggle-switch input[type="checkbox"] {
+  position: relative;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 40px;
+  height: 24px;
+  min-width: 40px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-full);
+  background: #72767d;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+/* Toggle Knob */
+.options-card .toggle-switch input[type="checkbox"]::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: white;
+  transition: transform var(--transition-fast);
+}
+
+/* Checked state */
+.options-card .toggle-switch input[type="checkbox"]:checked {
+  background: var(--success);
+}
+
+.options-card .toggle-switch input[type="checkbox"]:checked::before {
+  transform: translateX(16px);
+}
+
+/* Toggle Labels */
+.options-card .toggle-switch-label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.options-card .toggle-title {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-primary);
+}
+
+.options-card .toggle-desc {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+/* MCQ Count Row */
+#mcqCountRow {
+  padding: var(--space-3);
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+#mcqCountRow .form-label-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-2);
+}
+
+#mcqCountInput {
+  width: 80px;
+  padding: var(--space-2);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+}
+
+/* ================================================
+   UPLOAD CARD
+   ================================================ */
+
+.upload-card-modern {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.dropzone-compact {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8) var(--space-6);
+  border: 2px dashed var(--border-default);
+  border-radius: var(--radius-lg);
+  margin: var(--space-4);
+  text-align: center;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.dropzone-compact:hover {
+  border-color: var(--accent-primary);
+  background: var(--accent-subtle);
+}
+
+.dropzone-compact.drag-over {
+  border-color: var(--accent-primary);
+  background: var(--accent-subtle);
+}
+
+.dropzone-icon {
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+.dropzone-icon svg {
+  width: 48px;
+  height: 48px;
+  stroke-width: 1.5;
+}
+
+.dropzone-text h3 {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.dropzone-text p {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+  margin-bottom: var(--space-4);
+}
+
+/* ================================================
+   FILE QUEUE
+   ================================================ */
+
+.file-queue-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.file-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border-subtle);
+  margin-bottom: var(--space-3);
+}
+
+.file-queue-header h3 {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.queue-count {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.file-queue-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* ================================================
+   CUSTOM PROMPT
+   ================================================ */
+
+.custom-prompt-card {
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+}
+
+.custom-prompt-card .form-label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.custom-prompt-card .form-label span:first-child {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+}
+
+.custom-prompt-card .form-label-hint {
+  font-size: var(--font-size-xs);
+  color: var(--text-tertiary);
+}
+
+.input-with-button {
+  position: relative;
+}
+
+.input-with-button .textarea {
+  width: 100%;
+  padding: var(--space-3);
+  padding-right: var(--space-8);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: var(--font-size-sm);
+  resize: vertical;
+  min-height: 80px;
+}
+
+.input-with-button .textarea:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+.input-with-button .icon-btn {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.input-with-button .icon-btn:hover {
+  background: var(--bg-modifier-hover);
+  color: var(--text-primary);
+}
+
+/* ================================================
+   PROCESS BUTTON
+   ================================================ */
+
+.process-action {
+  padding-top: var(--space-2);
+}
+
+/* ================================================
+   RESULTS SECTION
+   ================================================ */
+
+.results-section {
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.results-header {
+  margin-bottom: var(--space-4);
+}
+
+.results-header h3 {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.results-header p {
+  font-size: var(--font-size-sm);
+  color: var(--text-tertiary);
+}
+
+.results-grid {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* ================================================
+   RESPONSIVE
+   ================================================ */
+
+@media (max-width: 768px) {
+  .radio-group {
+    flex-wrap: wrap;
+  }
+  
+  .radio-pill {
+    flex: 1 1 auto;
+    min-width: calc(50% - var(--space-1));
+  }
+  
+  .workspace-title {
+    font-size: var(--font-size-xl);
+  }
+}
+
+@media (max-width: 480px) {
+  .options-card {
+    padding: var(--space-4);
+  }
+  
+  .dropzone-compact {
+    padding: var(--space-6) var(--space-4);
+  }
+}

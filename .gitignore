@@ -1,49 +1,78 @@
 # Dependencies
 node_modules/
-package-lock.json
 
 # Build outputs
 dist/
 out/
 build/
+release/
+*.exe
+*.dmg
+*.AppImage
+*.snap
+*.deb
+*.rpm
+*.msi
+*.nupkg
+*.blockmap
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+electron-debug.log*
 
 # Environment variables
 .env
-.env.local
+.env.*
+!.env.example
 
 # OS files
 .DS_Store
+.DS_Store?
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# IDE
+# IDE / Editor
 .vscode/
 .idea/
+*.sublime-*
 *.swp
 *.swo
 *~
+*.code-workspace
+
+# Test & Coverage
+coverage/
+.nyc_output/
+*.lcov
+
+# Caches
+.cache/
+.eslintcache
+.npm/
+*.tsbuildinfo
 
 # Electron
-out/
-dist/
+electron-builder.env
 
-# Local Data Dir
+# Local data
 data/
+userData/
 
-# Premium plan (private business plans)
-premium-plan/
-
-# Workspace settings
-Squailor.code-workspace
-
-__tests__/
-
+# Generated / Misc
+npm-audit*.json
 .github/
-
 upgrade.md
+TODO.md
+
+# Lock files (optional - uncomment if you want to track)
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+premium-plan/

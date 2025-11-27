@@ -1,4 +1,6 @@
-'use strict';
+"use strict";
+
+const { parseMcqsFromText } = require('../utils/mcq');
 
 // Summary view logic extracted from renderer.js
 
@@ -139,7 +141,131 @@ function viewFullSummary(index) {
     }
   } catch (_) {}
 
-  renderSummaryContent(contentDiv, item.summary);
+  // If this is an MCQ-style summary, parse and render interactive MCQs
+  let parsedMcqs = null;
+  try {
+    if (item.summaryStyle === 'mcqs') parsedMcqs = parseMcqsFromText(item.summary || '');
+  } catch (_) { parsedMcqs = null; }
+
+  if (parsedMcqs && Array.isArray(parsedMcqs.questions) && parsedMcqs.questions.length > 0) {
+    // Render the intro and interactive MCQs
+    contentDiv.innerHTML = '';
+    const introHtml = (typeof window.electronAPI?.parseMarkdown === 'function' && parsedMcqs.intro)
+      ? (window.electronAPI.sanitizeHtml ? window.electronAPI.sanitizeHtml(window.electronAPI.parseMarkdown(parsedMcqs.intro)) : '')
+      : '';
+    if (introHtml) {
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = introHtml;
+      contentDiv.appendChild(wrapper);
+    } else if (parsedMcqs.intro) {
+      const p = document.createElement('p');
+      p.textContent = parsedMcqs.intro;
+      contentDiv.appendChild(p);
+    }
+
+    const list = document.createElement('div');
+    // Toolbar: copy MCQs JSON
+    const toolbar = document.createElement('div');
+    toolbar.className = 'mcq-toolbar';
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'btn btn-ghost btn-small mcq-copy-json';
+    copyBtn.textContent = 'Copy MCQs (JSON)';
+    copyBtn.addEventListener('click', async () => {
+      try {
+        const payload = JSON.stringify(parsedMcqs, null, 2);
+        if (navigator && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(payload);
+        } else {
+          // fallback for older environments: temporary textarea
+          const t = document.createElement('textarea');
+          t.value = payload;
+          t.style.position = 'fixed';
+          t.style.left = '-9999px';
+          document.body.appendChild(t);
+          t.select();
+          document.execCommand && document.execCommand('copy');
+          document.body.removeChild(t);
+        }
+        copyBtn.textContent = 'Copied ✓';
+        setTimeout(() => { copyBtn.textContent = 'Copy MCQs (JSON)'; }, 1500);
+      } catch (e) {
+        copyBtn.textContent = 'Copy failed';
+        setTimeout(() => { copyBtn.textContent = 'Copy MCQs (JSON)'; }, 1500);
+      }
+    });
+    list.className = 'mcq-list';
+
+    // Insert toolbar before question list
+    list.appendChild(toolbar);
+    toolbar.appendChild(copyBtn);
+
+    parsedMcqs.questions.forEach((q, idx) => {
+      const itemEl = document.createElement('div');
+      itemEl.className = 'mcq-item';
+      itemEl.dataset.index = String(idx);
+
+      const qEl = document.createElement('div');
+      qEl.className = 'mcq-question';
+      qEl.textContent = `${idx + 1}) ${q.question}`;
+
+      const optionsEl = document.createElement('ol');
+      optionsEl.className = 'mcq-options';
+      q.options.forEach(opt => {
+        const li = document.createElement('li');
+        li.dataset.optLabel = opt.label;
+        li.textContent = `${opt.label}) ${opt.text}`;
+        optionsEl.appendChild(li);
+      });
+
+      const answerEl = document.createElement('div');
+      answerEl.className = 'mcq-answer';
+      answerEl.hidden = true;
+      let answerTextToShow = '';
+      if (q.correctLabel) {
+        const correctLabelText = `${q.correctLabel})`;
+        const explanation = q.explanation ? ` — ${q.explanation}` : '';
+        answerTextToShow = `${correctLabelText}${explanation}`;
+      } else if (q.answerText) {
+        // If parser found a full-text answer, show it verbatim
+        answerTextToShow = q.answerText;
+        if (q.explanation) answerTextToShow += ` — ${q.explanation}`;
+      } else if (q.explanation) {
+        answerTextToShow = q.explanation;
+      } else {
+        answerTextToShow = 'Not specified';
+      }
+      answerEl.textContent = `Answer: ${answerTextToShow}`;
+
+      const revealBtn = document.createElement('button');
+      revealBtn.className = 'mcq-reveal-btn btn btn-ghost btn-small';
+      revealBtn.textContent = 'Reveal answer';
+      revealBtn.addEventListener('click', () => {
+        // toggle
+        const show = answerEl.hidden;
+        answerEl.hidden = !show;
+        revealBtn.textContent = show ? 'Hide answer' : 'Reveal answer';
+        // highlight correct option only when showing the answer; when hiding remove highlights
+        Array.from(optionsEl.children).forEach(li => {
+          li.classList.remove('mcq-selected');
+          if (show) {
+            if (q.correctLabel && li.dataset.optLabel === q.correctLabel) li.classList.add('mcq-correct');
+          } else {
+            li.classList.remove('mcq-correct');
+          }
+        });
+      });
+
+      itemEl.appendChild(qEl);
+      itemEl.appendChild(optionsEl);
+      itemEl.appendChild(revealBtn);
+      itemEl.appendChild(answerEl);
+      list.appendChild(itemEl);
+    });
+
+    contentDiv.appendChild(list);
+  } else {
+    renderSummaryContent(contentDiv, item.summary);
+  }
 
   if (window.summaryQa && typeof window.summaryQa.setupSummaryQaChat === 'function') {
     window.summaryQa.setupSummaryQaChat(item);

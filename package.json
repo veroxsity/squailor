@@ -3,9 +3,13 @@
   "version": "1.0.0",
   "description": "AI-powered document summarizer for PowerPoint and PDF files",
   "main": "main.js",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
   "scripts": {
     "start": "electron .",
-    "dev": "set NODE_ENV=development&& electron .",
+    "dev": "cross-env NODE_ENV=development electron .",
     "build": "node scripts/build.js",
     "prebuild": "node scripts/verify-deps.js",
     "build:win": "node scripts/build.js --win",
@@ -13,10 +17,14 @@
     "build:installer": "node scripts/build.js --win nsis",
     "build:mac": "node scripts/build.js --mac",
     "build:linux": "node scripts/build.js --linux",
-    "test": "jest --runInBand",
-    "lint": "eslint . --ext .js",
+    "test": "jest --config config/jest.config.js --runInBand",
+    "test:coverage": "jest --config config/jest.config.js --runInBand --coverage",
+    "lint": "eslint . --config config/eslint.config.js",
+    "lint:fix": "eslint . --config config/eslint.config.js --fix",
     "format": "prettier --write .",
-    "make-icon": "node scripts/make-icon.js"
+    "format:check": "prettier --check .",
+    "make-icon": "node scripts/make-icon.js",
+    "typecheck": "tsc --noEmit --allowJs --checkJs"
   },
   "keywords": [
     "electron",
@@ -24,7 +32,9 @@
     "summarizer",
     "pdf",
     "powerpoint",
-    "openai"
+    "openai",
+    "anthropic",
+    "document"
   ],
   "author": "veroxsity <veroxsity@gmail.com>",
   "license": "ISC",
@@ -32,12 +42,12 @@
     "@anthropic-ai/sdk": "^0.22.0",
     "@google/generative-ai": "^0.17.0",
     "cohere-ai": "^7.13.0",
+    "dompurify": "^3.1.6",
     "electron-log": "^4.4.7",
     "electron-updater": "^6.6.2",
     "image-size": "^2.0.2",
     "jszip": "^3.10.1",
-  "marked": "^16.3.0",
-  "dompurify": "^3.1.6",
+    "marked": "^4.3.0",
     "openai": "^6.0.1",
     "pdf-lib": "^1.17.1",
     "pdf-parse-fork": "^1.2.0",
@@ -46,14 +56,17 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
-    "electron": "^38.2.0",
+    "@eslint/js": "^9.12.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.0.0",
     "electron-builder": "^26.0.12",
-    "jimp": "^1.6.0",
-    "jest": "^29.7.0",
     "eslint": "^9.12.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-import": "^2.29.1",
-    "prettier": "^3.2.5"
+    "jest": "^29.7.0",
+    "jimp": "^1.6.0",
+    "prettier": "^3.2.5",
+    "typescript": "^5.4.0"
   },
   "bin": {},
   "build": {
@@ -68,11 +81,9 @@
     },
     "files": [
       "*.js",
-      "*.html",
-      "*.css",
       "src/**/*",
-      "styles/**/*",
       "assets/**/*",
+      "types/**/*",
       "node_modules/**/*",
       "!node_modules/.cache/**/*",
       "!documentation/**/*",
@@ -85,15 +96,11 @@
       "target": [
         {
           "target": "nsis",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         },
         {
           "target": "zip",
-          "arch": [
-            "x64"
-          ]
+          "arch": ["x64"]
         }
       ],
       "icon": "assets/icon.ico"
@@ -118,18 +125,12 @@
       "include": "scripts/installer.nsh"
     },
     "mac": {
-      "target": [
-        "dmg",
-        "zip"
-      ],
+      "target": ["dmg", "zip"],
       "icon": "assets/icon.icns",
       "category": "public.app-category.productivity"
     },
     "linux": {
-      "target": [
-        "AppImage",
-        "deb"
-      ],
+      "target": ["AppImage", "deb"],
       "icon": "assets/icon.png",
       "category": "Utility"
     },
